@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+/* Custom CSS Variables */
+:root {
+  --bg-primary: #0f1117;
+  --bg-secondary: #1a1d29;
+  --bg-tertiary: #252836;
+  --text-primary: #ffffff;
+  --text-secondary: #6b7280;
+  --accent-blue: #3b82f6;
+  --positive: #10b981;
+  --negative: #ef4444;
+  --warning: #f59e0b;
+}
+
+/* Base Styles */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', 'SF Pro', 'Segoe UI', sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3a3f4b;
+}
+
+/* Price Flash Animation */
+@keyframes flash-green {
+
+  0%,
+  100% {
+    background-color: transparent;
+  }
+
+  50% {
+    background-color: rgba(16, 185, 129, 0.3);
+  }
+}
+
+@keyframes flash-red {
+
+  0%,
+  100% {
+    background-color: transparent;
+  }
+
+  50% {
+    background-color: rgba(239, 68, 68, 0.3);
+  }
+}
+
+.flash-green {
+  animation: flash-green 0.5s ease-out;
+}
+
+.flash-red {
+  animation: flash-red 0.5s ease-out;
+}
+
+/* Spin Animation for Refresh Button */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}

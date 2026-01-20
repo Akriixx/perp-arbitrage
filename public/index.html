@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Arbitrage Scanner</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <div class="app-layout">
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <div class="brand">
+                <i data-lucide="zap" class="brand-icon"></i>
+                <span>ArbiScanner</span>
+            </div>
+
+            <div class="search-box">
+                <i data-lucide="search" class="search-icon"></i>
+                <input type="text" id="pair-search" placeholder="Search Pair (e.g. BTC)">
+            </div>
+
+            <nav class="menu">
+                <div class="menu-section">
+                    <h3 class="menu-title">EXCHANGES</h3>
+                    <ul id="exchange-filter">
+                        <li class="menu-item active" data-filter="ALl">
+                            <i data-lucide="layers"></i> All Exchanges
+                        </li>
+                        <li class="menu-item" data-filter="Paradex">
+                            <i data-lucide="bar-chart-2"></i> Paradex
+                        </li>
+                        <li class="menu-item" data-filter="Vest">
+                            <i data-lucide="activity"></i> Vest
+                        </li>
+                        <li class="menu-item" data-filter="Lighter">
+                            <i data-lucide="zap"></i> Lighter
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="menu-section">
+                    <h3 class="menu-title">LISTS</h3>
+                    <ul>
+                        <li class="menu-item" id="btn-favorites">
+                            <i data-lucide="star"></i> Favorites
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
+            <div class="status-footer">
+                <div class="indicator" id="status-indicator"></div>
+                <span id="last-update">Connecting...</span>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="main-content">
+            <header class="top-bar">
+                <h2 id="page-title">Market Overview</h2>
+                <div class="actions">
+                    <button class="btn-secondary" id="btn-reset">Clear Filters</button>
+                </div>
+            </header>
+
+            <div class="content-scroll">
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Pair</th>
+                                <th>Vest (Bid/Ask)</th>
+                                <th>Lighter (Bid/Ask)</th>
+                                <th>Paradex (Bid/Ask)</th>
+                                <th>Real Spread</th>
+                                <th>Strategy</th>
+                                <th>Profit (1k$)</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="opportunities-body">
+                            <!-- Rows injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- CHART SECTION -->
+                <div class="chart-section" id="chart-section" style="display:none;">
+                    <div class="chart-header">
+                        <h3 id="chart-title">Spread History</h3>
+                        <button class="close-chart" onclick="closeChart()">×</button>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="spreadChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="client.js"></script>
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+
+</html>
