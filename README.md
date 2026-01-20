@@ -10,39 +10,46 @@ Real-time arbitrage scanner for perpetual futures across multiple DEXs.
 - **Professional UI**: React + Tailwind dashboard
 - **Favorites & Filters**: Search, filter by exchange, save favorites
 
-## Tech Stack
+## Project Structure
 
-- **Backend**: Node.js + Express + SQLite
-- **Frontend**: React + Vite + Tailwind CSS
-- **Icons**: Lucide React
-- **Charts**: Chart.js
+```
+perp-arbitrage/
+├── backend/
+│   └── src/
+│       ├── config/         # Configuration constants
+│       ├── services/       # Exchange API services
+│       ├── controllers/    # Route handlers
+│       ├── routes/         # API routes
+│       ├── db/             # Database layer
+│       ├── utils/          # Utility functions
+│       └── index.js        # Entry point
+├── frontend/
+│   └── src/
+│       ├── components/     # React components
+│       └── App.jsx         # Main app
+└── package.json            # Monorepo scripts
+```
 
 ## Installation
 
 ```bash
 # Clone the repo
-git clone https://github.com/YOUR_USERNAME/perp-arbitrage.git
+git clone https://github.com/Akriix/perp-arbitrage.git
 cd perp-arbitrage
 
-# Install backend dependencies
-npm install
-
-# Install frontend dependencies
-cd frontend
-npm install
+# Install all dependencies
+npm run install:all
 ```
 
 ## Running
 
 ```bash
-# Terminal 1: Start backend (port 3000)
-npm start
-# or
-node server.js
-
-# Terminal 2: Start frontend (port 5173)
-cd frontend
+# Run both backend and frontend
 npm run dev
+
+# Or separately:
+npm run dev:backend   # Port 3000
+npm run dev:frontend  # Port 5173
 ```
 
 Open http://localhost:5173 in your browser.
@@ -53,10 +60,6 @@ Open http://localhost:5173 in your browser.
 |----------|-------------|
 | `GET /api/scans` | Get all pairs with prices |
 | `GET /api/spread-history` | Get spread history for a pair |
-
-## Screenshot
-
-![Dashboard](./screenshot.png)
 
 ## License
 
