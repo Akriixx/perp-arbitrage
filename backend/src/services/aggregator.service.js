@@ -242,26 +242,28 @@ async function startScheduler() {
     // V3: Ghost Mode simulation engine - PAUSED
     // liveSimulation.init();
 
-    // Start Paradex WebSocket (already WS-only)
+    // Start Paradex WebSocket
     paradexWS = new ParadexWebSocketService();
     paradexWS.on('data', handleParadexData);
     paradexWS.on('error', (error) => {
-        logger.error(TAG, 'Paradex WebSocket error', error);
+        // Silently handle - will be logged by ParadexWS service
+    });
+    paradexWS.on('connected', () => {
+        logger.info(TAG, '[Paradex] ✅ WebSocket: CONNECTED');
     });
     paradexWS.connect();
-    logger.info(TAG, 'Paradex WebSocket started');
 
-    // Start Vest Hybrid Service (WS + REST fallback)
+    // Start Vest REST-only Service
     vestHybridService.on('update', handleVestUpdate);
     await vestHybridService.start();
-    logger.info(TAG, 'Vest Hybrid Service started (WS primary, REST fallback)');
 
-    // Start Lighter Hybrid Service (WS + REST fallback)
+    // Start Lighter WebSocket Service
     lighterHybridService.on('update', handleLighterUpdate);
     await lighterHybridService.start();
-    logger.info(TAG, 'Lighter Hybrid Service started (WS primary, REST fallback)');
 
-    logger.info(TAG, '✓ All V2+V3 services started - Ghost Mode active');
+    logger.info(TAG, '════════════════════════════════════════════════');
+    logger.info(TAG, '✓ All services started - Observation Mode Active');
+    logger.info(TAG, '════════════════════════════════════════════════');
 }
 
 /**

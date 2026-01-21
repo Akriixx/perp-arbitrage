@@ -30,9 +30,10 @@ class ParadexWebSocketService extends EventEmitter {
         this.ws = new WebSocket('wss://ws.api.prod.paradex.trade/v1');
 
         this.ws.on('open', () => {
-            logger.info(TAG, 'Connected successfully');
+            logger.info(TAG, '✅ WebSocket: CONNECTED');
             this.isConnected = true;
             this.reconnectAttempts = 0;
+            this.emit('connected');
             this.subscribeToMarkets();
         });
 

@@ -24,8 +24,8 @@ class LighterHybridService extends HybridExchangeService {
     private ws: WebSocket | null = null;
     private pingInterval: NodeJS.Timeout | null = null;
     private reconnectAttempts = 0;
-    private readonly maxReconnectAttempts = 5;  // Reduced - REST is primary
-    private readonly reconnectDelay = 10000;    // Slower reconnect
+    private readonly maxReconnectAttempts = 10;  // More attempts since WS works
+    private readonly reconnectDelay = 5000;       // 5s initial delay (faster recovery)
     private wsDisabled: boolean = false;
 
     // Market ID mapping (symbol -> market_id)
@@ -42,23 +42,20 @@ class LighterHybridService extends HybridExchangeService {
         super(config);
     }
 
-    // Override start to do initial REST fetch immediately
+    // Override start - WS primary since it works for Lighter
     async start(): Promise<void> {
-        logger.info(this.name, 'Starting hybrid service (REST primary)');
+        logger.info(this.name, 'Starting service (WS primary)');
 
         // Fetch market indices first
         await this.fetchMarketIndices();
 
-        // Do initial REST fetch immediately
+        // Do initial REST fetch for immediate data
         await this.doFallbackFetch();
 
-        // Start REST polling immediately
-        this.startFallback();
+        // Connect WebSocket (primary)
+        await this.connectWebSocket();
 
-        // Try WS in background (non-blocking)
-        this.connectWebSocket().catch(() => { });
-
-        // Start watchdog
+        // Start watchdog for fallback detection
         this.startWatchdog();
     }
 
@@ -76,12 +73,18 @@ class LighterHybridService extends HybridExchangeService {
                 this.ws = new WebSocket(this.wsUrl);
 
                 this.ws.on('open', () => {
-                    logger.info(TAG, 'WebSocket connected');
+                    const marketCount = Object.keys(this.marketIndexMap).length;
+                    logger.info(TAG, `✅ WebSocket: CONNECTED (${marketCount} markets)`);
                     this.isWsConnected = true;
                     this.reconnectAttempts = 0;
                     this.lastWsMessage = Date.now();
                     this.startPing();
                     this.subscribeToMarkets();
+
+                    // Stop REST fallback since WS is working
+                    if (this.fallbackActive) {
+                        this.stopFallback();
+                    }
                     resolve();
                 });
 

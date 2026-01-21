@@ -1,190 +1,143 @@
 /**
- * Vest Hybrid Exchange Service
- * WebSocket-primary with REST fallback
+ * Vest REST-Only Exchange Service
+ * WebSocket disabled due to Cloudflare 530 errors
+ * Uses REST polling exclusively for price data
  */
 
-import WebSocket from 'ws';
 import axios from 'axios';
-import { HybridExchangeService, HybridConfig, TimestampedPrice } from './HybridExchangeService';
+import { EventEmitter } from 'events';
 import { MarketData } from './BaseExchangeService';
+import { TimestampedPrice } from './HybridExchangeService';
 import { logger } from '../../utils/logger';
 import { API_ENDPOINTS } from '../../config/exchanges';
 import { ALLOWED_SYMBOLS, COMMON_HEADERS, REQUEST_TIMEOUT, CONCURRENCY } from '../../config';
 import { sleep } from '../../utils/sleep';
 
-const TAG = 'VestHybrid';
-const WS_URL = 'wss://wsprod.vest.exchange/ws-api?version=1.0&xwebsocketserver=restserver';
+const TAG = 'Vest';
 
-// Timeout and staleness thresholds
-const WS_TIMEOUT = 15000;      // 15 seconds before fallback
-const STALE_THRESHOLD = 30000; // 30 seconds before data is invalid
+// REST polling interval (2 seconds)
+const REST_POLL_INTERVAL = 2000;
+const STALE_THRESHOLD = 30000;
 
-class VestHybridService extends HybridExchangeService {
+class VestHybridService extends EventEmitter {
     readonly name = 'VEST';
 
-    private ws: WebSocket | null = null;
-    private pingInterval: NodeJS.Timeout | null = null;
-    private reconnectAttempts = 0;
-    private readonly maxReconnectAttempts = 5; // Reduced - we'll use REST primarily
-    private readonly reconnectDelay = 10000;   // Slower reconnect, REST is primary
-    private wsDisabled: boolean = false;        // Flag to stop WS attempts temporarily
+    private priceCache: Map<string, TimestampedPrice> = new Map();
+    private pollInterval: NodeJS.Timeout | null = null;
+    private isRunning: boolean = false;
 
     constructor() {
-        const config: HybridConfig = {
-            name: 'VEST',
-            wsUrl: WS_URL,
-            wsTimeout: WS_TIMEOUT,
-            staleThreshold: STALE_THRESHOLD
-        };
-        super(config);
+        super();
     }
 
-    // Override start to do initial REST fetch immediately
+    /**
+     * Start REST-only service
+     */
     async start(): Promise<void> {
-        logger.info(this.name, 'Starting hybrid service (REST primary due to WS issues)');
+        logger.info(TAG, '📡 Mode: REST ONLY (WS Disabled to avoid 530 errors)');
 
-        // Do initial REST fetch immediately - don't wait for WS
-        await this.doFallbackFetch();
+        // Do initial fetch
+        await this.fetchAndUpdate();
 
-        // Start REST polling immediately
-        this.startFallback();
-
-        // Try WS in background (non-blocking)
-        this.connectWebSocket().catch(() => { });
-
-        // Start watchdog
-        this.startWatchdog();
+        // Start polling
+        this.isRunning = true;
+        this.pollInterval = setInterval(() => {
+            this.fetchAndUpdate();
+        }, REST_POLL_INTERVAL);
     }
 
-    // ==================== WebSocket Implementation ====================
+    /**
+     * Stop the service
+     */
+    stop(): void {
+        this.isRunning = false;
+        if (this.pollInterval) {
+            clearInterval(this.pollInterval);
+            this.pollInterval = null;
+        }
+        logger.info(TAG, 'Service stopped');
+    }
 
-    protected async connectWebSocket(): Promise<void> {
-        return new Promise((resolve) => {
-            try {
-                logger.info(TAG, `Connecting to WebSocket: ${this.wsUrl}`);
-                this.ws = new WebSocket(this.wsUrl);
+    /**
+     * Fetch prices via REST and emit updates
+     */
+    private async fetchAndUpdate(): Promise<void> {
+        try {
+            const markets = await this.fetchMarkets();
+            const now = Date.now();
 
-                this.ws.on('open', () => {
-                    logger.info(TAG, 'WebSocket connected');
-                    this.isWsConnected = true;
-                    this.reconnectAttempts = 0;
-                    this.lastWsMessage = Date.now();
-                    this.startPing();
-                    this.subscribeToMarkets();
-                    resolve();
+            markets.forEach(m => {
+                const price: TimestampedPrice = {
+                    symbol: m.symbol,
+                    bid: m.bid,
+                    ask: m.ask,
+                    timestamp: now,
+                    source: 'rest'
+                };
+
+                this.priceCache.set(m.symbol, price);
+                this.emit('update', price);
+            });
+
+            logger.debug(TAG, `REST update: ${markets.length} prices`);
+        } catch (error: any) {
+            logger.error(TAG, `REST fetch failed: ${error.message}`);
+        }
+    }
+
+    /**
+     * Get current market data
+     */
+    getMarkets(): MarketData[] {
+        const now = Date.now();
+        const valid: MarketData[] = [];
+
+        this.priceCache.forEach((price) => {
+            if (now - price.timestamp <= STALE_THRESHOLD) {
+                valid.push({
+                    symbol: price.symbol,
+                    bid: price.bid,
+                    ask: price.ask
                 });
-
-                this.ws.on('message', (data: WebSocket.Data) => {
-                    this.handleWsMessage(data);
-                });
-
-                this.ws.on('error', (error: Error) => {
-                    logger.error(TAG, `WebSocket error: ${error.message}`);
-                    // On error (like 530), make sure REST fallback is active
-                    if (!this.fallbackActive) {
-                        logger.warn(TAG, 'WS error detected, ensuring REST fallback is active');
-                        this.startFallback();
-                    }
-                });
-
-                this.ws.on('close', () => {
-                    logger.info(TAG, 'WebSocket closed');
-                    this.isWsConnected = false;
-                    this.stopPing();
-                    // Don't spam reconnects if we keep getting errors
-                    if (this.reconnectAttempts < this.maxReconnectAttempts && !this.wsDisabled) {
-                        this.scheduleReconnect();
-                    } else {
-                        logger.warn(TAG, 'WS disabled, using REST only');
-                        this.wsDisabled = true;
-                    }
-                });
-
-            } catch (error: any) {
-                logger.error(TAG, 'WebSocket connection failed', error);
-                this.scheduleReconnect();
-                resolve();
             }
         });
+
+        return valid;
     }
 
-    protected disconnectWebSocket(): void {
-        this.stopPing();
-        if (this.ws) {
-            this.ws.close();
-            this.ws = null;
-        }
-        this.isWsConnected = false;
+    /**
+     * Check if data is fresh
+     */
+    isDataFresh(symbol: string): boolean {
+        const price = this.priceCache.get(symbol);
+        if (!price) return false;
+        return (Date.now() - price.timestamp) <= STALE_THRESHOLD;
     }
 
-    protected subscribeToMarkets(): void {
-        const params = ALLOWED_SYMBOLS.map(s => `${s}-PERP@depth`);
-        logger.info(TAG, `Subscribing to ${params.length} markets via WS`);
+    /**
+     * Get service stats
+     */
+    getStats() {
+        const now = Date.now();
+        let fresh = 0;
+        let stale = 0;
 
-        const msg = {
-            method: 'SUBSCRIBE',
-            params,
-            id: Date.now()
+        this.priceCache.forEach(price => {
+            if (now - price.timestamp <= STALE_THRESHOLD) fresh++;
+            else stale++;
+        });
+
+        return {
+            fresh,
+            stale,
+            wsActive: false,  // WS is permanently disabled
+            fallbackActive: true
         };
-
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify(msg));
-        }
     }
 
-    private handleWsMessage(data: WebSocket.Data): void {
-        try {
-            const msg = JSON.parse(data.toString());
-
-            // Handle depth updates: { "channel": "BTC-PERP@depth", "data": { "bids": [], "asks": [] } }
-            if (msg.channel && msg.channel.endsWith('@depth') && msg.data) {
-                const symbol = msg.channel.split('-')[0];
-                const { bids, asks } = msg.data;
-
-                const bid = bids?.length > 0 ? parseFloat(bids[0][0]) : 0;
-                const ask = asks?.length > 0 ? parseFloat(asks[0][0]) : 0;
-
-                if (bid > 0 || ask > 0) {
-                    this.onWsUpdate(symbol, bid, ask);
-                }
-            }
-        } catch (e) {
-            // Ignore parse errors
-        }
-    }
-
-    private startPing(): void {
-        this.pingInterval = setInterval(() => {
-            if (this.ws && this.isWsConnected) {
-                try {
-                    this.ws.send(JSON.stringify({ method: 'PING', params: [], id: 0 }));
-                } catch (e) { }
-            }
-        }, 30000);
-    }
-
-    private stopPing(): void {
-        if (this.pingInterval) {
-            clearInterval(this.pingInterval);
-            this.pingInterval = null;
-        }
-    }
-
-    private scheduleReconnect(): void {
-        if (this.reconnectAttempts < this.maxReconnectAttempts) {
-            this.reconnectAttempts++;
-            const delay = Math.min(this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1), 30000);
-            logger.info(TAG, `Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-            setTimeout(() => this.connectWebSocket(), delay);
-        } else {
-            logger.warn(TAG, 'Max reconnect attempts reached, will retry in 60s');
-            this.reconnectAttempts = 0;
-            setTimeout(() => this.connectWebSocket(), 60000);
-        }
-    }
-
-    // ==================== REST Fallback Implementation ====================
-
+    /**
+     * Fetch markets via REST API
+     */
     async fetchMarkets(): Promise<MarketData[]> {
         const results: MarketData[] = [];
 
@@ -222,7 +175,7 @@ class VestHybridService extends HybridExchangeService {
                 await sleep(100);
             }
         } catch (error: any) {
-            logger.error(TAG, 'REST fetch failed', error);
+            logger.error(TAG, `REST fetch failed: ${error.message}`);
         }
 
         return results;
