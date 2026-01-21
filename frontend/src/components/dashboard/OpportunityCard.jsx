@@ -1,4 +1,4 @@
-import { Settings, X, RotateCcw } from 'lucide-react';
+import { Bell, BellOff, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import CryptoIcon from './CryptoIcon';
 import ExchangeIcon from './ExchangeIcon';
@@ -48,15 +48,18 @@ export default function OpportunityCard({
                 </div>
             )}
 
-            {/* Settings Button */}
+            {/* Alert Settings Button */}
             <button
                 onClick={(e) => {
                     e.stopPropagation();
                     setSettingsOpenFor(isSettingsOpen ? null : row.symbol);
                 }}
-                className={`absolute top-3 right-3 z-10 p-1.5 rounded-lg transition-colors ${isSettingsOpen ? 'bg-blue-500/20 text-blue-400' : 'text-gray-600 hover:text-gray-300 hover:bg-white/5'}`}
+                className={`absolute top-3 right-3 z-10 p-2 rounded-xl transition-all duration-300 ${isAlerting || hasCustomThreshold
+                        ? 'bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20 shadow-lg shadow-yellow-500/10'
+                        : 'text-gray-600 hover:text-gray-300 hover:bg-white/5'
+                    }`}
             >
-                <Settings className="w-4 h-4" />
+                <Bell className={`w-4 h-4 ${hasCustomThreshold ? 'fill-current' : ''}`} />
             </button>
 
             {/* Settings Popup */}
@@ -67,7 +70,7 @@ export default function OpportunityCard({
                 >
                     <div className="flex justify-between items-center mb-3">
                         <h3 className="text-white font-bold text-sm flex items-center gap-2">
-                            <Settings className="w-3.5 h-3.5 text-blue-400" />
+                            <Bell className="w-3.5 h-3.5 text-blue-400" />
                             Alerts for {row.symbol}
                         </h3>
                         <button onClick={() => setSettingsOpenFor(null)} className="text-gray-500 hover:text-white transition-colors">
@@ -107,8 +110,8 @@ export default function OpportunityCard({
                             onClick={() => updateThreshold(row.symbol, null)}
                             className="flex items-center gap-2 text-[10px] text-gray-500 hover:text-white transition-colors self-start opacity-70 hover:opacity-100"
                         >
-                            <RotateCcw className="w-3 h-3" />
-                            Reset to Default ({minSpread > 0 ? minSpread.toFixed(1) : '0.1'}%)
+                            <BellOff className="w-3 h-3" />
+                            Désactiver l'alerte
                         </button>
                     </div>
                 </div>

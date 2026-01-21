@@ -78,7 +78,7 @@ export default function PositionsTab({ positions, pairs, onRemove, onUpdate }) {
                                             <h3 className="text-2xl font-bold text-white leading-none mb-2">{pos.symbol}</h3>
                                             <div className="flex items-center gap-2 text-gray-500 text-xs font-medium">
                                                 <Clock className="w-3.5 h-3.5" />
-                                                Opened {new Date(pos.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                Opened {new Date(pos.timestamp).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                             </div>
                                         </div>
                                     </div>
