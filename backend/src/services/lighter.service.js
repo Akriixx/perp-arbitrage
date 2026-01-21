@@ -9,32 +9,40 @@ const { REQUEST_TIMEOUT } = require('../config');
 
 /**
  * Fetch all perp markets from Lighter
- * Uses last_trade_price as approximate bid/ask
+ * Uses best_bid and best_ask from orderBookDetails
  * @returns {Promise<Array>} Array of { symbol, bid, ask }
  */
 async function fetchLighterMarkets() {
     try {
         const res = await axios.get(API_ENDPOINTS.LIGHTER, { timeout: REQUEST_TIMEOUT });
         const markets = res.data.order_book_details || [];
+
         const results = [];
 
         markets.forEach(m => {
             if (m.market_type === 'perp' && m.status === 'active') {
-                const symbol = m.symbol.split('-')[0];
+                // Lighter symbols are sometimes just "SOL", "ETH"
+                const symbol = m.symbol.includes('--') ? m.symbol.split('--')[0] : m.symbol;
 
                 if (!isCrypto(symbol)) return;
 
-                const lastPrice = parseFloat(m.last_trade_price || 0);
-                if (lastPrice > 0) {
+                // Use bid/ask if available, otherwise last_trade_price
+                // Note: orderBookDetails often only provides last_trade_price
+                const bestBid = parseFloat(m.best_bid || m.last_trade_price || 0);
+                const bestAsk = parseFloat(m.best_ask || m.last_trade_price || 0);
+
+
+                if (bestBid > 0 && bestAsk > 0) {
                     results.push({
                         symbol,
-                        bid: lastPrice,
-                        ask: lastPrice
+                        bid: bestBid,
+                        ask: bestAsk
                     });
                 }
             }
         });
 
+        console.log(`[Lighter] Returning ${results.length} pairs with real bid/ask`);
         return results;
     } catch (error) {
         console.error('[Lighter] Error:', error.message);

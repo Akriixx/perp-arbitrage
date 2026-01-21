@@ -1,157 +1,196 @@
-/**
- * MarketTable Component (Optimized)
- * - Virtualized rows for performance
- * - Memoized components to prevent re-renders
- * - O(1) favorites lookup with Set
- */
-
-import { memo, useMemo, useRef } from 'react';
+import { memo, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Star, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Star, ArrowUpDown, ArrowUp, ArrowDown, TrendingUp, TrendingDown } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { formatPrice, formatSpread, getSpreadColor, getSpreadBg } from '../../utils/formatters';
+import { Badge } from '../ui/Badge';
+import { cn } from '../../utils/cn';
+import { ExpandableRow } from './ExpandableRow';
 
-// Memoized PriceCell - only re-renders when props change
-const PriceCell = memo(function PriceCell({ price, isBestBid, isBestAsk }) {
-    if (!price || (price.bid === 0 && price.ask === 0)) {
-        return <span className="text-gray-600">-</span>;
+// Grid Layout Definition
+const GRID_COLS = "grid-cols-[48px_1.2fr_1.5fr_1.2fr_1fr_1fr_1fr]";
+
+// Memoized PriceCell
+// Memoized PriceCell
+const PriceCell = memo(function PriceCell({ price, isBestBid, isBestAsk, bestEx }) {
+    const bid = price?.bid || 0;
+    const ask = price?.ask || 0;
+
+    if (!price || (bid === 0 && ask === 0)) {
+        return <span className="text-text-muted text-sm font-mono text-center block">-</span>;
     }
 
     return (
-        <div className="flex flex-col items-center gap-0.5">
-            <span className={`text-sm font-medium ${isBestBid ? 'text-red-500' : 'text-white'}`}>
-                {formatPrice(price.bid)}
-            </span>
-            <span className={`text-xs ${isBestAsk ? 'text-green-500' : 'text-gray-500'}`}>
-                {formatPrice(price.ask)}
-            </span>
+        <div className="flex flex-col items-center gap-1 font-mono">
+            <div className={cn(
+                "text-sm font-semibold transition-all duration-300 px-1.5 rounded",
+                isBestBid ? "text-profit-green drop-shadow-[0_0_8px_rgba(16,185,129,0.3)]" : "text-white"
+            )}>
+                {formatPrice(bid)}
+            </div>
+            <div className={cn(
+                "text-xs font-medium transition-all duration-300 px-1.5 rounded",
+                isBestAsk ? "text-loss-red drop-shadow-[0_0_8px_rgba(239,68,68,0.3)]" : "text-text-muted"
+            )}>
+                {formatPrice(ask)}
+            </div>
         </div>
     );
 });
 
-// Memoized TableRow - only re-renders when its specific pair changes
-const TableRow = memo(function TableRow({ pair, isFavorite, onToggleFavorite }) {
+// Memoized Row
+const MarketRow = memo(function MarketRow({ pair, isFavorite, onToggleFavorite, style, isEven }) {
     const spread = pair.realSpread ?? -999;
     const hasStrategy = pair.bestBidEx && pair.bestAskEx && pair.bestBidEx !== pair.bestAskEx;
+    const isProfitable = spread > 0;
 
     return (
-        <tr className="border-b border-[#252836] hover:bg-[#252836]/50 transition-colors">
+        <div
+            style={style}
+            className={cn(
+                "w-full grid items-center border-b border-app-border transition-colors hover:bg-white/5",
+                GRID_COLS,
+                isEven ? "bg-transparent" : "bg-white/[0.02]"
+            )}
+        >
             {/* Favorite Star */}
-            <td className="px-4 py-3">
+            <div className="px-4 py-3 flex justify-center">
                 <button
                     onClick={() => onToggleFavorite(pair.symbol)}
-                    className="p-1 hover:bg-[#252836] rounded transition-colors"
+                    className="p-2 rounded-lg hover:bg-white/5 text-text-muted hover:text-yellow-500 transition-all active:scale-90"
                 >
                     <Star
-                        className={`w-4 h-4 ${isFavorite ? 'text-yellow-500 fill-yellow-500' : 'text-gray-600 hover:text-gray-400'}`}
+                        className={cn("w-4 h-4 transition-all", isFavorite && "text-yellow-500 fill-yellow-500")}
                     />
                 </button>
-            </td>
+            </div>
 
             {/* Pair Symbol */}
-            <td className="px-4 py-3">
-                <span className="text-white font-semibold">{pair.symbol}</span>
-            </td>
+            <div className="px-4 py-3">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-primary/20 to-brand-secondary/20 flex items-center justify-center text-[10px] font-bold text-white border border-white/10 shrink-0">
+                        {pair.symbol.substring(0, 3)}
+                    </div>
+                    <div className="min-w-0">
+                        <div className="text-white font-bold text-sm tracking-tight truncate">{pair.symbol}</div>
+                        <div className="text-[10px] text-text-muted font-medium uppercase">Perpetual</div>
+                    </div>
+                </div>
+            </div>
 
             {/* Spread */}
-            <td className="px-4 py-3">
-                <span className={`inline-flex items-center px-2 py-1 rounded ${getSpreadBg(spread)} ${getSpreadColor(spread)} font-medium text-sm`}>
-                    {formatSpread(spread)}
-                </span>
-            </td>
+            <div className="px-4 py-3">
+                <div className="flex items-center gap-2">
+                    <div className={cn(
+                        "text-base font-bold font-mono tracking-tight",
+                        isProfitable ? "text-profit-green" : "text-loss-red"
+                    )}>
+                        {formatSpread(spread)}
+                    </div>
+                    {isProfitable && <TrendingUp className="w-4 h-4 text-profit-green" />}
+                    {!isProfitable && spread !== -999 && <TrendingDown className="w-4 h-4 text-loss-red" />}
+                </div>
+                {isProfitable && (
+                    <div className="h-1 w-24 bg-app-dark rounded-full mt-1.5 overflow-hidden">
+                        <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${Math.min(spread * 50, 100)}%` }}
+                            transition={{ duration: 1, ease: "easeOut" }}
+                            className="h-full bg-profit-green shadow-[0_0_10px_#10b981]"
+                        />
+                    </div>
+                )}
+            </div>
 
             {/* Strategy */}
-            <td className="px-4 py-3">
+            <div className="px-4 py-3">
                 {hasStrategy ? (
-                    <div className="flex flex-col gap-1">
-                        <span className="inline-flex items-center px-2 py-0.5 bg-green-500/20 text-green-500 text-xs font-bold uppercase rounded">
-                            LONG {pair.bestAskEx}
-                        </span>
-                        <span className="inline-flex items-center px-2 py-0.5 bg-red-500/20 text-red-500 text-xs font-bold uppercase rounded">
-                            SHORT {pair.bestBidEx}
-                        </span>
+                    <div className="flex flex-col gap-1.5 items-start">
+                        <Badge variant="profit" className="shadow-sm text-[10px] px-2">
+                            L: {pair.bestAskEx}
+                        </Badge>
+                        <Badge variant="loss" className="shadow-sm text-[10px] px-2">
+                            S: {pair.bestBidEx}
+                        </Badge>
                     </div>
                 ) : (
-                    <span className="text-gray-600">-</span>
+                    <span className="text-text-muted text-xs italic opacity-50">-</span>
                 )}
-            </td>
+            </div>
 
             {/* Exchange Prices */}
-            <td className="px-4 py-3 text-center">
-                <PriceCell price={pair.lighter} isBestBid={pair.bestBidEx === 'LIGHTER'} isBestAsk={pair.bestAskEx === 'LIGHTER'} />
-            </td>
-            <td className="px-4 py-3 text-center">
-                <PriceCell price={pair.paradex} isBestBid={pair.bestBidEx === 'PARADEX'} isBestAsk={pair.bestAskEx === 'PARADEX'} />
-            </td>
-            <td className="px-4 py-3 text-center">
-                <PriceCell price={pair.vest} isBestBid={pair.bestBidEx === 'VEST'} isBestAsk={pair.bestAskEx === 'VEST'} />
-            </td>
-        </tr>
+            <div className="px-2 py-3"><PriceCell price={pair.lighter} isBestBid={pair.bestBidEx === 'LIGHTER'} isBestAsk={pair.bestAskEx === 'LIGHTER'} /></div>
+            <div className="px-2 py-3"><PriceCell price={pair.paradex} isBestBid={pair.bestBidEx === 'PARADEX'} isBestAsk={pair.bestAskEx === 'PARADEX'} /></div>
+            <div className="px-2 py-3"><PriceCell price={pair.vest} isBestBid={pair.bestBidEx === 'VEST'} isBestAsk={pair.bestAskEx === 'VEST'} /></div>
+        </div>
     );
 });
 
-// Sort Icon Component
-const SortIcon = memo(function SortIcon({ field, sortField, sortDirection }) {
-    if (sortField !== field) {
-        return <ArrowUpDown className="w-4 h-4 text-gray-500" />;
-    }
-    return sortDirection === 'desc'
-        ? <ArrowDown className="w-4 h-4 text-blue-500" />
-        : <ArrowUp className="w-4 h-4 text-blue-500" />;
-});
+// Header Component
+const MarketHeader = ({ onSort, sortField, sortDirection }) => (
+    <div className={cn("grid border-b border-app-border bg-app-card/95 backdrop-blur z-10 sticky top-0 text-xs font-bold text-text-secondary uppercase tracking-wider", GRID_COLS)}>
+        <div className="px-4 py-4"></div>
+        <div className="px-4 py-4">Asset</div>
+        <div
+            className="px-4 py-4 cursor-pointer hover:text-white transition-colors flex items-center gap-2 group"
+            onClick={() => onSort('realSpread')}
+        >
+            Spread
+            <div className="opacity-0 group-hover:opacity-50 transition-opacity">
+                {sortField === 'realSpread' ? (
+                    sortDirection === 'desc' ? <ArrowDown className="w-3 h-3" /> : <ArrowUp className="w-3 h-3" />
+                ) : <ArrowUpDown className="w-3 h-3" />}
+            </div>
+        </div>
+        <div className="px-4 py-4">Strategy</div>
+        <div className="px-4 py-4 text-center">Lighter</div>
+        <div className="px-4 py-4 text-center">Paradex</div>
+        <div className="px-4 py-4 text-center">Vest</div>
+    </div>
+);
 
-// Main MarketTable Component
+// Main Component
 function MarketTable({ pairs, favorites, onToggleFavorite, sortField, sortDirection, onSort }) {
-    const containerRef = useRef(null);
-
-    // O(1) lookup for favorites using Set
+    const parentRef = useRef(null);
     const favoritesSet = useMemo(() => new Set(favorites), [favorites]);
+    const shouldVirtualize = pairs.length > 50;
+    const [expandedPair, setExpandedPair] = useState(null);
 
-    // Virtual row renderer
+    // Debug logging
+    console.log(`[MarketTable] Rendering ${pairs.length} pairs. Virtualized: ${shouldVirtualize}`);
+
+    const toggleExpand = (symbol) => {
+        setExpandedPair(prev => prev === symbol ? null : symbol);
+    };
+
     const rowVirtualizer = useVirtualizer({
         count: pairs.length,
-        getScrollElement: () => containerRef.current,
-        estimateSize: () => 56, // Estimated row height
-        overscan: 5,
+        getScrollElement: () => parentRef.current,
+        estimateSize: () => 72,
+        overscan: 10,
+        enabled: shouldVirtualize
     });
 
     if (pairs.length === 0) {
+        // ... (empty state)
         return (
-            <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-                <p className="text-lg mb-4">No pairs found matching your filters</p>
-                <p className="text-sm">Try adjusting your search or exchange filter</p>
+            <div className="flex flex-col items-center justify-center h-96 text-text-muted bg-app-card/50 rounded-2xl border border-app-border backdrop-blur-sm">
+                <p className="text-xl font-bold text-white mb-2">No pairs found</p>
+                <p className="text-sm text-text-secondary">Try adjusting filters</p>
             </div>
         );
     }
 
     return (
-        <div className="bg-[#1a1d29] rounded-xl border border-[#252836] overflow-hidden flex flex-col h-full">
-            {/* Fixed Header */}
-            <table className="w-full">
-                <thead>
-                    <tr className="border-b border-[#252836]">
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-12"></th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Pair</th>
-                        <th
-                            className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
-                            onClick={() => onSort('realSpread')}
-                        >
-                            <div className="flex items-center gap-1">
-                                Spread
-                                <SortIcon field="realSpread" sortField={sortField} sortDirection={sortDirection} />
-                            </div>
-                        </th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Strategy</th>
-                        <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Lighter</th>
-                        <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Paradex</th>
-                        <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Vest</th>
-                    </tr>
-                </thead>
-            </table>
+        <div className="bg-app-card/50 backdrop-blur-md rounded-2xl border border-app-border shadow-2xl overflow-hidden flex flex-col h-full ring-1 ring-white/5">
+            <MarketHeader onSort={onSort} sortField={sortField} sortDirection={sortDirection} />
 
-            {/* Virtualized Body */}
-            <div ref={containerRef} className="flex-1 overflow-auto">
-                <table className="w-full">
-                    <tbody
+            <div
+                ref={parentRef}
+                className="flex-1 overflow-auto custom-scrollbar relative"
+            >
+                {shouldVirtualize ? (
+                    <div
                         style={{
                             height: `${rowVirtualizer.getTotalSize()}px`,
                             width: '100%',
@@ -161,16 +200,58 @@ function MarketTable({ pairs, favorites, onToggleFavorite, sortField, sortDirect
                         {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                             const pair = pairs[virtualRow.index];
                             return (
-                                <TableRow
+                                <MarketRow
                                     key={pair.symbol}
                                     pair={pair}
                                     isFavorite={favoritesSet.has(pair.symbol)}
+                                    // wrapper handling required for virtualization + expansion which is complex.
+                                    // For now, disabling expansion in virtualized mode or treating it as just row
                                     onToggleFavorite={onToggleFavorite}
+                                    isEven={virtualRow.index % 2 === 0}
+                                    style={{
+                                        position: 'absolute',
+                                        top: 0,
+                                        left: 0,
+                                        width: '100%',
+                                        height: `${virtualRow.size}px`,
+                                        transform: `translateY(${virtualRow.start}px)`,
+                                    }}
                                 />
                             );
                         })}
-                    </tbody>
-                </table>
+                    </div>
+                ) : (
+                    <div className="w-full">
+                        {pairs.map((pair, index) => (
+                            <div key={pair.symbol} className="flex flex-col transition-colors">
+                                <div
+                                    onClick={(e) => {
+                                        // Prevent expansion when clicking favorite star or other buttons
+                                        if (e.target.closest('button')) return;
+                                        toggleExpand(pair.symbol);
+                                    }}
+                                    className="cursor-pointer"
+                                >
+                                    <MarketRow
+                                        pair={pair}
+                                        isFavorite={favoritesSet.has(pair.symbol)}
+                                        onToggleFavorite={onToggleFavorite}
+                                        isEven={index % 2 === 0}
+                                        style={{
+                                            height: '72px',
+                                            position: 'relative'
+                                        }}
+                                    />
+                                </div>
+                                <ExpandableRow
+                                    pair={pair}
+                                    isOpen={expandedPair === pair.symbol}
+                                    onClose={() => setExpandedPair(null)}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );

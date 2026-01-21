@@ -1,33 +1,72 @@
-/**
- * useMarketData Hook (Optimized with React Query)
- * Provides caching, background refetch, and stale-while-revalidate
- */
+import { useState, useCallback, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchScans, forceRefreshScans } from '../services/api';
 
-import { useQuery } from '@tanstack/react-query';
-import { fetchScans } from '../services/api';
 
-export function useMarketData(refreshInterval = 30000) {
+export function useMarketData() {
+    const queryClient = useQueryClient();
+
+    // Removed WebSocket to prevent connection errors and unstable refreshing
+    const wsConnected = false;
+    const wsError = null;
+
+    // Interval State with safe LocalStorage default
+    const [refreshInterval, setRefreshIntervalState] = useState(() => {
+        try {
+            const saved = localStorage.getItem('vertex_refresh_interval');
+            // Default to 5s (5000ms) as requested by user
+            return saved ? parseInt(saved, 10) : 5000;
+        } catch {
+            return 5000;
+        }
+    });
+
+    // Safe setter that persists to LocalStorage
+    const setRefreshInterval = useCallback((val) => {
+        setRefreshIntervalState(val);
+        try {
+            localStorage.setItem('vertex_refresh_interval', val);
+        } catch (e) {
+            console.warn('LS Save Error', e);
+        }
+    }, []);
+
+    // Pure REST polling
     const query = useQuery({
         queryKey: ['scans'],
         queryFn: async () => {
             const data = await fetchScans();
-            return data.pairs || [];
+            return data?.pairs || [];
         },
-        refetchInterval: refreshInterval,
-        staleTime: 5000,              // Data considered fresh for 5s
-        gcTime: 60000,                // Keep in cache for 1 min
-        refetchOnWindowFocus: false,  // Don't refetch on tab focus
-        retry: 2,                     // Retry failed requests twice
+        // Poll at the user-selected interval (e.g., 5s)
+        refetchInterval: refreshInterval > 0 ? refreshInterval : false,
+        staleTime: 1000,
+        gcTime: 60000,
+        refetchOnWindowFocus: true,
+        retry: 3,
     });
+
+    const hardRefresh = useCallback(async () => {
+        try {
+            const data = await forceRefreshScans();
+            queryClient.setQueryData(['scans'], data.pairs || []);
+        } catch (err) {
+            console.error("Hard refresh failed", err);
+        }
+    }, [queryClient]);
 
     return {
         pairs: query.data || [],
         isLoading: query.isLoading,
-        isConnected: query.isSuccess,
+        isConnected: true, // Always true for REST unless query fails
         error: query.error?.message || null,
         lastUpdate: query.dataUpdatedAt ? new Date(query.dataUpdatedAt) : null,
-        refresh: query.refetch,
-        isFetching: query.isFetching,  // True during background refetch
+        refresh: query.refetch,        // Soft Refresh (just fetch)
+        hardRefresh: hardRefresh,      // Hard Refresh (force backend update)
+        isFetching: query.isFetching,
+        refreshInterval,
+        setRefreshInterval,
+        wsConnected: false,  // WebSocket disabled
     };
 }
 

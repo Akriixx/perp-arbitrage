@@ -4,8 +4,8 @@
  */
 
 const axios = require('axios');
-const { API_ENDPOINTS, isCrypto } = require('../config/exchanges');
-const { COMMON_HEADERS, REQUEST_TIMEOUT, CONCURRENCY } = require('../config');
+const { API_ENDPOINTS } = require('../config/exchanges');
+const { ALLOWED_SYMBOLS, COMMON_HEADERS, REQUEST_TIMEOUT, CONCURRENCY } = require('../config');
 const { sleep } = require('../utils/sleep');
 
 /**
@@ -44,13 +44,16 @@ async function fetchVestMarkets() {
         const symbolsToFetch = [];
 
         tickers.forEach(t => {
-            if (t.symbol.endsWith('-USD-PERP') || t.symbol.endsWith('-PERP')) {
-                const symbol = t.symbol.split('-')[0];
-                if (isCrypto(symbol)) {
-                    symbolsToFetch.push({ base: symbol, querySym: t.symbol });
+            // Vest symbols appear as "SOL-PERP" or "ETH-PERP"
+            if (t.symbol.endsWith('-PERP')) {
+                const baseSymbol = t.symbol.split('-')[0];
+                if (ALLOWED_SYMBOLS.includes(baseSymbol)) {
+                    symbolsToFetch.push({ base: baseSymbol, querySym: t.symbol });
                 }
             }
         });
+
+        console.log(`[Vest] Queued ${symbolsToFetch.length} symbols for depth fetch`);
 
         // 2. Fetch depth for each symbol in batches
         for (let i = 0; i < symbolsToFetch.length; i += CONCURRENCY) {
@@ -73,6 +76,7 @@ async function fetchVestMarkets() {
         console.error('[Vest] Error:', error.message);
     }
 
+    console.log(`[Vest] Returning ${results.length} pairs:`, results.map(r => r.symbol).join(', '));
     return results;
 }
 

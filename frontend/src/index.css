@@ -1,95 +1,105 @@
 @import "tailwindcss";
 
-/* Custom CSS Variables */
-:root {
-  --bg-primary: #0f1117;
-  --bg-secondary: #1a1d29;
-  --bg-tertiary: #252836;
-  --text-primary: #ffffff;
-  --text-secondary: #6b7280;
-  --accent-blue: #3b82f6;
-  --positive: #10b981;
-  --negative: #ef4444;
-  --warning: #f59e0b;
+@theme {
+  /* Dark Mode Base */
+  --color-app-dark: #0f1117;
+  --color-app-card: #1a1d29;
+  --color-app-card-hover: #252836;
+  --color-app-border: #2e3245;
+
+  /* Vivid Accents */
+  --color-brand-primary: #3b82f6;
+  --color-brand-secondary: #8b5cf6;
+  --color-profit-green: #10b981;
+  --color-loss-red: #ef4444;
+  --color-text-primary: #f3f4f6;
+  --color-text-secondary: #9ca3af;
+  --color-text-muted: #6b7280;
+
+  /* Custom Utilities */
+  --animate-fade-in: fadeIn 0.3s ease-in-out;
+  --animate-slide-up: slideUp 0.4s ease-out;
+  --animate-pulse-glow: pulseGlow 2s infinite;
 }
 
 /* Base Styles */
-* {
-  box-sizing: border-box;
-}
-
 body {
-  margin: 0;
-  font-family: 'Inter', 'SF Pro', 'Segoe UI', sans-serif;
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
+  background-color: var(--color-app-dark);
+  color: var(--color-text-primary);
+  font-family: 'Inter', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Scrollbar */
+/* Modern Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-secondary);
+  background: var(--color-app-dark);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--bg-tertiary);
+  background: var(--color-app-border);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3a3f4b;
+  background: var(--color-text-muted);
 }
 
-/* Price Flash Animation */
-@keyframes flash-green {
-
-  0%,
-  100% {
-    background-color: transparent;
-  }
-
-  50% {
-    background-color: rgba(16, 185, 129, 0.3);
-  }
+/* Glassmorphism Utilities */
+.glass {
+  background: rgba(26, 29, 41, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-@keyframes flash-red {
-
-  0%,
-  100% {
-    background-color: transparent;
-  }
-
-  50% {
-    background-color: rgba(239, 68, 68, 0.3);
-  }
+.glass-card {
+  background: linear-gradient(145deg, rgba(26, 29, 41, 0.9), rgba(15, 17, 23, 0.9));
+  border: 1px solid var(--color-app-border);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
-.flash-green {
-  animation: flash-green 0.5s ease-out;
-}
-
-.flash-red {
-  animation: flash-red 0.5s ease-out;
-}
-
-/* Spin Animation for Refresh Button */
-@keyframes spin {
+/* Animations */
+@keyframes fadeIn {
   from {
-    transform: rotate(0deg);
+    opacity: 0;
   }
 
   to {
-    transform: rotate(360deg);
+    opacity: 1;
   }
 }
 
-.animate-spin {
-  animation: spin 1s linear infinite;
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulseGlow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 5px rgba(59, 130, 246, 0.2);
+  }
+
+  50% {
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
+  }
+}
+
+/* Utility for grid backgrounds */
+.bg-grid-pattern {
+  background-size: 40px 40px;
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
 }

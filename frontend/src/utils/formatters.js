@@ -8,7 +8,15 @@ import { SPREAD_THRESHOLDS } from './constants';
  * Format price for display
  */
 export function formatPrice(price) {
-    if (!price || price === 0) return '-';
+    if (price === null || price === undefined) return '-';
+    // Handle string inputs safely
+    if (typeof price === 'string') {
+        const num = parseFloat(price);
+        if (isNaN(num)) return price;
+        price = num;
+    }
+
+    if (price === 0) return '0.00';
     if (price < 0.01) return price.toPrecision(4);
     if (price < 1) return price.toFixed(4);
     if (price < 100) return price.toFixed(3);

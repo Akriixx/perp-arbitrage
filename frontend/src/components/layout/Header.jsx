@@ -1,99 +1,84 @@
-import { RefreshCw, Bell, ChevronDown } from 'lucide-react'
+import { motion } from "framer-motion";
+import { Zap, Activity, Settings, Menu, ChevronDown, RotateCw } from "lucide-react";
+import { Badge } from "../ui/Badge";
+import { cn } from "../../utils/cn";
 
-function Header({
-    refreshIntervals,
-    currentInterval,
-    onIntervalChange,
-    lastUpdate,
-    onRefresh,
-    isLoading,
-    isConnected,
-    onClearFilters
-}) {
-    const formatTime = (date) => {
-        if (!date) return '--:--:--'
-        return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-    }
+const INTERVAL_OPTIONS = [
+    { value: 3000, label: '3s' },
+    { value: 5000, label: '5s' },
+    { value: 15000, label: '15s' },
+    { value: 30000, label: '30s' },
+    { value: 0, label: 'Manual' },
+];
 
+export default function Header({ lastUpdated, isConnected, onRefresh, onHardRefresh, isRefreshing, refreshInterval, onIntervalChange }) {
     return (
-        <header className="h-16 bg-[#1a1d29] border-b border-[#252836] flex items-center justify-between px-6">
-            {/* Left: Logo & Nav */}
-            <div className="flex items-center gap-8">
-                <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                        <span className="text-white font-bold text-sm">A</span>
+        <header className="fixed top-0 left-0 right-0 h-16 glass z-50 px-6 flex items-center justify-between">
+            {/* ... Logo ... */}
+            <div className="flex items-center gap-3">
+                <div className="relative">
+                    <div className="absolute inset-0 bg-brand-primary blur-md opacity-50 rounded-full" />
+                    <div className="relative bg-brand-primary/10 p-2 rounded-xl border border-brand-primary/20">
+                        <Zap className="w-5 h-5 text-brand-primary fill-brand-primary" />
                     </div>
-                    <span className="text-white font-semibold text-lg">Arbitrage Dashboard</span>
                 </div>
-
-                <nav className="flex items-center gap-1">
-                    <button className="px-4 py-2 text-sm font-medium text-white bg-blue-600/20 border border-blue-600/50 rounded-lg">
-                        Dashboard
-                    </button>
-                    <button className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-white hover:bg-[#252836] rounded-lg transition-colors">
-                        Positions
-                    </button>
-                    <button className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-white hover:bg-[#252836] rounded-lg transition-colors">
-                        Metrics
-                    </button>
-                </nav>
+                <h1 className="text-xl font-bold tracking-tight">
+                    <span className="text-white">Vertex</span>
+                    <span className="text-brand-primary">Scan</span>
+                </h1>
+                <Badge variant="brand" className="ml-2 hidden sm:flex">v1.2</Badge>
             </div>
 
-            {/* Right: Controls */}
+            {/* Right Section */}
             <div className="flex items-center gap-4">
-                {/* Refresh Interval Selector */}
-                <div className="relative">
+                {/* Interval Selector */}
+                <div className="hidden md:flex items-center relative group z-50">
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none text-text-secondary group-hover:text-white transition-colors">
+                        <ChevronDown className="w-3 h-3" />
+                    </div>
                     <select
-                        value={currentInterval}
+                        value={refreshInterval}
                         onChange={(e) => onIntervalChange(Number(e.target.value))}
-                        className="appearance-none bg-[#252836] text-white text-sm px-3 py-2 pr-8 rounded-lg border border-[#3a3f4b] focus:outline-none focus:border-blue-500 cursor-pointer"
+                        className="appearance-none bg-app-card border border-app-border text-xs font-bold text-text-secondary py-1.5 pl-3 pr-8 rounded-lg outline-none focus:border-brand-primary focus:text-white cursor-pointer hover:bg-white/5 transition-all text-right"
                     >
-                        {refreshIntervals.map(({ value, label }) => (
-                            <option key={value} value={value}>{label}</option>
+                        {INTERVAL_OPTIONS.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
                         ))}
                     </select>
-                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 </div>
-
-                {/* Last Update */}
-                <span className="text-sm text-gray-400">
-                    Updated: <span className="text-white">{formatTime(lastUpdate)}</span>
-                </span>
-
-                {/* Refresh Button */}
-                <button
-                    onClick={onRefresh}
-                    disabled={isLoading}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
-                >
-                    <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-                    Refresh
-                </button>
-
-                {/* Clear Filters */}
-                <button
-                    onClick={onClearFilters}
-                    className="px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-[#252836] rounded-lg transition-colors"
-                >
-                    Clear Filters
-                </button>
-
-                {/* Notifications */}
-                <button className="relative p-2 text-yellow-500 hover:bg-[#252836] rounded-lg transition-colors">
-                    <Bell className="w-5 h-5" />
-                    <span className="absolute top-1 right-1 w-2 h-2 bg-yellow-500 rounded-full"></span>
-                </button>
 
                 {/* Connection Status */}
-                <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                    <span className={`text-sm ${isConnected ? 'text-green-500' : 'text-red-500'}`}>
-                        {isConnected ? 'Connected' : 'Disconnected'}
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-app-card border border-app-border text-xs font-medium">
+                    <span className="relative flex h-2 w-2">
+                        <span className={cn(
+                            "animate-ping absolute inline-flex h-full w-full rounded-full opacity-75",
+                            isConnected ? "bg-profit-green" : "bg-loss-red"
+                        )} />
+                        <span className={cn(
+                            "relative inline-flex rounded-full h-2 w-2",
+                            isConnected ? "bg-profit-green" : "bg-loss-red"
+                        )} />
+                    </span>
+                    <span className="text-text-secondary w-20">
+                        {lastUpdated ? lastUpdated.toLocaleTimeString() : '--:--:--'}
                     </span>
                 </div>
+
+                {/* Hard Refresh Button */}
+                <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={onHardRefresh}
+                    disabled={isRefreshing}
+                    title="Force Hard Refresh"
+                    className={cn(
+                        "p-2 rounded-lg bg-white/5 text-text-secondary border border-app-border hover:bg-white/10 hover:text-white transition-all",
+                        isRefreshing && "opacity-50 cursor-not-allowed"
+                    )}
+                >
+                    <RotateCw className={cn("w-5 h-5", isRefreshing && "animate-spin")} />
+                </motion.button>
             </div>
         </header>
-    )
+    );
 }
-
-export default Header

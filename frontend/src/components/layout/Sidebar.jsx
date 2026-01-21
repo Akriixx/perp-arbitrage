@@ -1,97 +1,60 @@
-import { Search, Star, Layers, BarChart2, Activity, Zap, Droplet, Square, Cloud, Plane, TrendingUp } from 'lucide-react'
+import { motion } from "framer-motion";
+import { LayoutDashboard, Star, Filter, TrendingUp } from "lucide-react";
+import { cn } from "../../utils/cn";
 
-const ICON_MAP = {
-    Layers,
-    BarChart2,
-    Activity,
-    Zap,
-    Droplet,
-    Square,
-    Cloud,
-    Plane,
-    TrendingUp,
-}
+const NAV_ITEMS = [
+    { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { id: 'favorites', icon: Star, label: 'Favorites' },
+    { id: 'analytics', icon: TrendingUp, label: 'Analytics' },
+];
 
-function Sidebar({
-    exchanges,
-    selectedExchange,
-    onSelectExchange,
-    searchQuery,
-    onSearchChange,
-    favorites,
-    showFavoritesOnly,
-    onToggleFavorites
-}) {
+export default function Sidebar({ activeTab, onTabChange }) {
     return (
-        <aside className="w-64 bg-[#1a1d29] border-r border-[#252836] flex flex-col">
-            {/* Search */}
-            <div className="p-4">
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                    <input
-                        type="text"
-                        placeholder="Search pair..."
-                        value={searchQuery}
-                        onChange={(e) => onSearchChange(e.target.value)}
-                        className="w-full bg-[#252836] text-white text-sm pl-10 pr-4 py-2.5 rounded-lg border border-[#3a3f4b] placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
-                    />
-                </div>
-            </div>
+        <aside className="fixed left-0 top-16 bottom-0 w-64 glass border-r border-app-border hidden md:flex flex-col py-6 px-4 z-40">
+            <nav className="space-y-2">
+                {NAV_ITEMS.map((item) => {
+                    const isActive = activeTab === item.id;
+                    const Icon = item.icon;
 
-            {/* Favorites Section */}
-            <div className="px-4 py-2">
-                <button
-                    onClick={onToggleFavorites}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${showFavoritesOnly
-                            ? 'bg-blue-600/20 border border-blue-600/50 text-white'
-                            : 'text-gray-400 hover:text-white hover:bg-[#252836]'
-                        }`}
-                >
-                    <Star className={`w-5 h-5 ${showFavoritesOnly ? 'text-yellow-500 fill-yellow-500' : 'text-yellow-500'}`} />
-                    <span className="text-sm font-medium">Favorites</span>
-                    {favorites.length > 0 && (
-                        <span className="ml-auto bg-[#252836] text-gray-400 text-xs px-2 py-0.5 rounded-full">
-                            {favorites.length}
-                        </span>
-                    )}
-                </button>
-            </div>
+                    return (
+                        <button
+                            key={item.id}
+                            onClick={() => onTabChange(item.id)}
+                            className={cn(
+                                "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group relative overflow-hidden",
+                                isActive
+                                    ? "text-white"
+                                    : "text-text-secondary hover:text-white hover:bg-app-card-hover"
+                            )}
+                        >
+                            {isActive && (
+                                <motion.div
+                                    layoutId="activeTab"
+                                    className="absolute inset-0 bg-brand-primary/10 border-l-2 border-brand-primary"
+                                    initial={false}
+                                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                                />
+                            )}
 
-            {/* Exchanges Section */}
-            <div className="flex-1 px-4 py-2 overflow-y-auto">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-3">
-                    Exchanges
-                </h3>
-                <div className="space-y-1">
-                    {exchanges.map((exchange) => {
-                        const IconComponent = ICON_MAP[exchange.icon] || Layers
-                        const isSelected = selectedExchange === exchange.id
+                            <Icon className={cn(
+                                "w-5 h-5 transition-colors relative z-10",
+                                isActive ? "text-brand-primary" : "group-hover:text-brand-primary"
+                            )} />
+                            <span className="font-medium relative z-10">{item.label}</span>
+                        </button>
+                    );
+                })}
+            </nav>
 
-                        return (
-                            <button
-                                key={exchange.id}
-                                onClick={() => onSelectExchange(exchange.id)}
-                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${isSelected
-                                        ? 'bg-blue-600/20 border-l-2 border-blue-500 text-white'
-                                        : 'text-gray-400 hover:text-white hover:bg-[#252836] border-l-2 border-transparent'
-                                    }`}
-                            >
-                                <IconComponent className="w-5 h-5" />
-                                <span className="text-sm font-medium">{exchange.name}</span>
-                            </button>
-                        )
-                    })}
-                </div>
-            </div>
-
-            {/* Footer */}
-            <div className="p-4 border-t border-[#252836]">
-                <div className="text-xs text-gray-500 text-center">
-                    v1.0.0 • Arbitrage Scanner
+            <div className="mt-auto">
+                <div className="p-4 rounded-xl bg-gradient-to-br from-brand-secondary/10 to-brand-primary/5 border border-white/5">
+                    <h4 className="text-sm font-bold text-white mb-1">Pro Status</h4>
+                    <p className="text-xs text-text-muted mb-3">Live data connection active</p>
+                    <div className="h-1.5 w-full bg-app-dark rounded-full overflow-hidden">
+                        <div className="h-full bg-brand-primary w-full animate-pulse-glow" />
+                    </div>
                 </div>
             </div>
         </aside>
-    )
+    );
 }
-
-export default Sidebar

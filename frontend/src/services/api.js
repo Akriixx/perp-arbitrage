@@ -17,6 +17,13 @@ export async function fetchScans() {
 }
 
 /**
+ * Force refresh scans (currently same as fetchScans)
+ */
+export async function forceRefreshScans() {
+    return fetchScans();
+}
+
+/**
  * Fetch spread history for a symbol
  */
 export async function fetchSpreadHistory(symbol, period = '24h') {
@@ -29,5 +36,6 @@ export async function fetchSpreadHistory(symbol, period = '24h') {
 
 export default {
     fetchScans,
-    fetchSpreadHistory
+    fetchSpreadHistory,
+    forceRefreshScans
 };

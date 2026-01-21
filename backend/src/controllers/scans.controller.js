@@ -3,7 +3,7 @@
  * Handles API requests for market scan data
  */
 
-const { getPriceCache } = require('../services/aggregator.service');
+const { getPriceCache, updateMarketData } = require('../services/aggregator.service');
 
 /**
  * GET /api/scans
@@ -14,4 +14,20 @@ function getScans(req, res) {
     res.json({ pairs });
 }
 
-module.exports = { getScans };
+/**
+ * POST /api/refresh
+ * Forces an immediate update from exchanges
+ */
+async function refreshScans(req, res) {
+    try {
+        console.log('[API] Hard refresh requested');
+        const cache = await updateMarketData();
+        const pairs = Object.values(cache);
+        res.json({ pairs });
+    } catch (err) {
+        console.error('[API] Refresh failed:', err);
+        res.status(500).json({ error: 'Failed to refresh market data' });
+    }
+}
+
+module.exports = { getScans, refreshScans };

@@ -13,7 +13,7 @@ const { getPriceCache } = require('../services/aggregator.service');
 function saveTopPairsToDb() {
     const cache = getPriceCache();
     const pairs = Object.values(cache)
-        .filter(p => p.realSpread > -10)
+        .filter(p => p.realSpread > -10 && Math.abs(p.realSpread) < 50)
         .sort((a, b) => b.realSpread - a.realSpread)
         .slice(0, 5);
 

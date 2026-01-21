@@ -25,4 +25,17 @@ db.run(`CREATE TABLE IF NOT EXISTS price_metrics (
     potential_profit REAL
 )`);
 
+db.run(`CREATE TABLE IF NOT EXISTS alerts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp INTEGER,
+    symbol TEXT,
+    spread REAL,
+    exchange_buy TEXT,
+    exchange_sell TEXT,
+    price_buy REAL,
+    price_sell REAL,
+    is_sent_telegram INTEGER DEFAULT 0,
+    is_sent_discord INTEGER DEFAULT 0
+)`);
+
 module.exports = { db };
