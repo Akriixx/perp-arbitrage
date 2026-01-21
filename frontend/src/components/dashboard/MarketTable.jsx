@@ -156,8 +156,7 @@ function MarketTable({ pairs, favorites, onToggleFavorite, sortField, sortDirect
     const shouldVirtualize = pairs.length > 50;
     const [expandedPair, setExpandedPair] = useState(null);
 
-    // Debug logging
-    console.log(`[MarketTable] Rendering ${pairs.length} pairs. Virtualized: ${shouldVirtualize}`);
+
 
     const toggleExpand = (symbol) => {
         setExpandedPair(prev => prev === symbol ? null : symbol);

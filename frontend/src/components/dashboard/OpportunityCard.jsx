@@ -1,4 +1,4 @@
-import { Settings, X, RotateCcw, TrendingUp, TrendingDown } from 'lucide-react';
+import { Settings, X, RotateCcw } from 'lucide-react';
 import { motion } from 'framer-motion';
 import CryptoIcon from './CryptoIcon';
 import ExchangeIcon from './ExchangeIcon';
@@ -12,8 +12,7 @@ export default function OpportunityCard({
     getAlertThreshold,
     hasCustomThreshold,
     updateThreshold,
-    minSpread,
-    trend // 'up' | 'down' | undefined
+    minSpread
 }) {
     const spread = row.realSpread || 0;
     const buyEx = row.bestAskEx || 'Unknown';
@@ -22,13 +21,6 @@ export default function OpportunityCard({
     const threshold = getAlertThreshold(row.symbol);
     const isAlerting = hasCustomThreshold && spread >= threshold;
     const isSettingsOpen = settingsOpenFor === row.symbol;
-
-    // Trend flash classes
-    const getTrendClasses = () => {
-        if (trend === 'up') return 'trend-flash-up';
-        if (trend === 'down') return 'trend-flash-down';
-        return '';
-    };
 
     return (
         <motion.div
@@ -44,20 +36,8 @@ export default function OpportunityCard({
                     ? 'bg-[#1a1a1a] border-yellow-500/50 shadow-yellow-500/20 ring-1 ring-yellow-500/30'
                     : 'bg-[#1a1a1a] border-[#2a2a2a] hover:shadow-black/60 hover:border-blue-500/30'
                 }
-                ${getTrendClasses()}
             `}
         >
-            {/* Trend Indicator */}
-            {trend && (
-                <div className={`absolute top-2 left-2 p-1 rounded-md ${trend === 'up' ? 'bg-emerald-500/20' : 'bg-red-500/20'}`}>
-                    {trend === 'up' ? (
-                        <TrendingUp className="w-3 h-3 text-emerald-400" />
-                    ) : (
-                        <TrendingDown className="w-3 h-3 text-red-400" />
-                    )}
-                </div>
-            )}
-
             {/* Alert Indicator */}
             {isAlerting && (
                 <div className="absolute top-0 right-0 p-2">
@@ -74,8 +54,7 @@ export default function OpportunityCard({
                     e.stopPropagation();
                     setSettingsOpenFor(isSettingsOpen ? null : row.symbol);
                 }}
-                className={`absolute top-3 right-3 z-10 p-1.5 rounded-lg transition-colors ${isSettingsOpen ? 'bg-blue-500/20 text-blue-400' : 'text-gray-600 hover:text-gray-300 hover:bg-white/5'
-                    }`}
+                className={`absolute top-3 right-3 z-10 p-1.5 rounded-lg transition-colors ${isSettingsOpen ? 'bg-blue-500/20 text-blue-400' : 'text-gray-600 hover:text-gray-300 hover:bg-white/5'}`}
             >
                 <Settings className="w-4 h-4" />
             </button>
@@ -84,7 +63,7 @@ export default function OpportunityCard({
             {isSettingsOpen && (
                 <div
                     onClick={(e) => e.stopPropagation()}
-                    className="absolute top-10 right-2 z-20 w-64 bg-[#1f2937] border border-gray-700 rounded-xl shadow-2xl p-4 animate-in fade-in zoom-in-95 duration-200"
+                    className="absolute top-10 right-2 z-20 w-64 bg-[#1f2937] border border-gray-700 rounded-xl shadow-2xl p-4"
                 >
                     <div className="flex justify-between items-center mb-3">
                         <h3 className="text-white font-bold text-sm flex items-center gap-2">
@@ -141,7 +120,6 @@ export default function OpportunityCard({
                     symbol={row.symbol}
                     className="w-12 h-12 transform group-hover:scale-110 transition-transform duration-300"
                 />
-
                 <div>
                     <h2 className="text-xl font-bold text-white tracking-tight leading-tight">{row.symbol}</h2>
                     <div className="flex items-center gap-1.5 text-[#9ca3af] text-[10px] font-medium mt-0.5">
@@ -154,32 +132,16 @@ export default function OpportunityCard({
                 </div>
             </div>
 
-            {/* Badge APR (Spread) */}
+            {/* Spread Badge */}
             <div className={`
-                border rounded-xl text-center backdrop-blur-sm transition-all duration-300 relative py-2 px-4 my-4
+                border rounded-xl text-center py-2 px-4 my-4
                 ${isAlerting
                     ? 'bg-yellow-500/10 border-yellow-500/30'
-                    : trend === 'up'
-                        ? 'bg-emerald-500/20 border-emerald-500/40'
-                        : trend === 'down'
-                            ? 'bg-red-500/20 border-red-500/40'
-                            : 'bg-blue-500/10 border-blue-500/30 group-hover:bg-blue-500/15'
+                    : 'bg-blue-500/10 border-blue-500/30 group-hover:bg-blue-500/15'
                 }
             `}>
-                <span className={`
-                    font-bold block text-lg transition-colors duration-300
-                    ${isAlerting
-                        ? 'text-yellow-400'
-                        : trend === 'up'
-                            ? 'text-emerald-400'
-                            : trend === 'down'
-                                ? 'text-red-400'
-                                : 'text-blue-400'
-                    }
-                `}>
+                <span className={`font-bold block text-lg ${isAlerting ? 'text-yellow-400' : 'text-blue-400'}`}>
                     Spread {spread.toFixed(2)}%
-                    {trend === 'up' && <span className="text-xs ml-1">↑</span>}
-                    {trend === 'down' && <span className="text-xs ml-1">↓</span>}
                 </span>
             </div>
 
@@ -201,24 +163,6 @@ export default function OpportunityCard({
                     <span className="text-white font-mono text-xs">${row.bestBid?.toFixed(5)}</span>
                 </div>
             </div>
-
-            {/* CSS for trend flash animations */}
-            <style>{`
-                .trend-flash-up {
-                    animation: flashGreen 0.5s ease-out;
-                }
-                .trend-flash-down {
-                    animation: flashRed 0.5s ease-out;
-                }
-                @keyframes flashGreen {
-                    0% { background-color: rgba(16, 185, 129, 0.2); border-color: rgba(16, 185, 129, 0.5); }
-                    100% { background-color: #1a1a1a; }
-                }
-                @keyframes flashRed {
-                    0% { background-color: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.5); }
-                    100% { background-color: #1a1a1a; }
-                }
-            `}</style>
         </motion.div>
     );
 }

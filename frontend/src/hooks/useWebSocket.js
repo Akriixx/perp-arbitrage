@@ -9,11 +9,9 @@ export function useWebSocket(url, onMessage) {
     const connect = useCallback(() => {
         if (ws.current?.readyState === WebSocket.OPEN) return;
 
-        console.log('[WebSocket] Connecting to:', url);
         ws.current = new WebSocket(url);
 
         ws.current.onopen = () => {
-            console.log('[WebSocket] Connected');
             setIsConnected(true);
             setError(null);
         };
@@ -22,20 +20,15 @@ export function useWebSocket(url, onMessage) {
             try {
                 const data = JSON.parse(event.data);
                 if (onMessage) onMessage(data);
-            } catch (err) {
-                console.error('[WebSocket] Failed to parse message:', err);
-            }
+            } catch { /* ignore parse errors */ }
         };
 
         ws.current.onclose = () => {
-            console.log('[WebSocket] Disconnected');
             setIsConnected(false);
-            // Reconnect after 3 seconds
             reconnectTimeout.current = setTimeout(connect, 3000);
         };
 
-        ws.current.onerror = (err) => {
-            console.error('[WebSocket] Error:', err);
+        ws.current.onerror = () => {
             setError('Connection error');
             ws.current.close();
         };
@@ -45,7 +38,7 @@ export function useWebSocket(url, onMessage) {
         connect();
         return () => {
             if (ws.current) {
-                ws.current.onclose = null; // Prevent reconnect on manual close
+                ws.current.onclose = null;
                 ws.current.close();
             }
             if (reconnectTimeout.current) clearTimeout(reconnectTimeout.current);

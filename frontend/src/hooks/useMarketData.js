@@ -6,7 +6,7 @@ import { useWebSocket } from './useWebSocket';
 export function useMarketData() {
     const queryClient = useQueryClient();
 
-    // Determine WS URL (handles dev and prod)
+    // Determine WS URL
     const wsUrl = useMemo(() => {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const host = window.location.hostname;
@@ -14,17 +14,11 @@ export function useMarketData() {
         return `${protocol}//${host}${port ? `:${port}` : ''}`;
     }, []);
 
-    // === THROTTLE MECHANISM ===
-    // Store latest data in a ref (updates instantly from WS)
+    // Throttle: Store latest data in ref, update UI at controlled interval
     const latestDataRef = useRef([]);
-    // Store previous prices for trend detection
-    const previousPricesRef = useRef({});
-    // UI state (updates at controlled interval)
     const [displayedPairs, setDisplayedPairs] = useState([]);
-    // Price trends for animations
-    const [priceTrends, setPriceTrends] = useState({});
 
-    // Interval State with safe LocalStorage default
+    // Interval state with localStorage persistence
     const [refreshInterval, setRefreshIntervalState] = useState(() => {
         try {
             const saved = localStorage.getItem('vertex_refresh_interval');
@@ -38,67 +32,25 @@ export function useMarketData() {
         setRefreshIntervalState(val);
         try {
             localStorage.setItem('vertex_refresh_interval', val);
-        } catch (e) {
-            console.warn('LS Save Error', e);
-        }
+        } catch { /* ignore */ }
     }, []);
 
-    // Function to calculate price trends
-    const calculateTrends = useCallback((newData) => {
-        const trends = {};
-        const previousPrices = previousPricesRef.current;
-
-        newData.forEach(pair => {
-            const symbol = pair.symbol;
-            const currentSpread = pair.realSpread || 0;
-            const previousSpread = previousPrices[symbol]?.spread;
-
-            if (previousSpread !== undefined && previousSpread !== currentSpread) {
-                if (currentSpread > previousSpread) {
-                    trends[symbol] = 'up';
-                } else if (currentSpread < previousSpread) {
-                    trends[symbol] = 'down';
-                }
-            }
-
-            // Store current for next comparison
-            previousPrices[symbol] = {
-                spread: currentSpread,
-                bestBid: pair.bestBid,
-                bestAsk: pair.bestAsk
-            };
-        });
-
-        previousPricesRef.current = previousPrices;
-        return trends;
-    }, []);
-
-    // Transfer data from ref to UI state at controlled interval
+    // Transfer data from ref to UI state
     const refreshUI = useCallback(() => {
         const data = latestDataRef.current;
         if (data && data.length > 0) {
-            const trends = calculateTrends(data);
-            setPriceTrends(trends);
             setDisplayedPairs([...data]);
-
-            // Clear trends after animation duration
-            setTimeout(() => {
-                setPriceTrends({});
-            }, 600);
         }
-    }, [calculateTrends]);
+    }, []);
 
     // Setup throttled refresh interval
     useEffect(() => {
-        // Immediately refresh on interval change
         refreshUI();
-
         const timer = setInterval(refreshUI, refreshInterval);
-
         return () => clearInterval(timer);
     }, [refreshInterval, refreshUI]);
 
-    // WebSocket Message Handler - stores in ref (instant)
+    // WebSocket handler - stores in ref instantly
     const onWSMessage = useCallback((data) => {
         if (data.type === 'update' && data.pairs) {
             latestDataRef.current = data.pairs;
@@ -108,7 +60,7 @@ export function useMarketData() {
 
     const { isConnected: wsConnected, error: wsError } = useWebSocket(wsUrl, onWSMessage);
 
-    // Pure REST polling (Fallback / Secondary sync)
+    // REST polling fallback
     const query = useQuery({
         queryKey: ['scans'],
         queryFn: async () => {
@@ -117,7 +69,6 @@ export function useMarketData() {
             latestDataRef.current = pairs;
             return pairs;
         },
-        // Poll slower if WS is connected
         refetchInterval: wsConnected ? 30000 : 10000,
         staleTime: 1000,
         gcTime: 60000,
@@ -125,7 +76,7 @@ export function useMarketData() {
         retry: 3,
     });
 
-    // Initialize displayed pairs from query data
+    // Initialize from query data
     useEffect(() => {
         if (query.data && query.data.length > 0 && displayedPairs.length === 0) {
             latestDataRef.current = query.data;
@@ -140,25 +91,17 @@ export function useMarketData() {
             latestDataRef.current = pairs;
             queryClient.setQueryData(['scans'], pairs);
             refreshUI();
-        } catch (err) {
-            console.error("Hard refresh failed", err);
-        }
+        } catch { /* ignore */ }
     }, [queryClient, refreshUI]);
-
-    // Manual instant refresh
-    const instantRefresh = useCallback(() => {
-        refreshUI();
-    }, [refreshUI]);
 
     return {
         pairs: displayedPairs,
-        priceTrends, // { symbol: 'up' | 'down' | undefined }
         isLoading: query.isLoading && !wsConnected && displayedPairs.length === 0,
         isConnected: wsConnected || !query.error,
         error: (!wsConnected && query.isError) ? (wsError || query.error?.message) : null,
         lastUpdate: query.dataUpdatedAt ? new Date(query.dataUpdatedAt) : null,
-        refresh: instantRefresh,
-        hardRefresh: hardRefresh,
+        refresh: refreshUI,
+        hardRefresh,
         isFetching: query.isFetching,
         refreshInterval,
         setRefreshInterval,
