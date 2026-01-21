@@ -1,6 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { X, Target } from 'lucide-react';
 import DetailView from './components/dashboard/DetailView';
 import DashboardHeader from './components/dashboard/DashboardHeader';
 import OpportunityCard from './components/dashboard/OpportunityCard';
@@ -22,8 +21,7 @@ function App() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isActiveAlarmsModalOpen, setIsActiveAlarmsModalOpen] = useState(false);
 
-  // --- State with Persistence (Refactored to useLocalStorage) ---
-  const [isFocusMode, setIsFocusMode] = useLocalStorage('is_focus_mode', false);
+  // --- State with Persistence ---
   const [enabledExchanges, setEnabledExchanges] = useLocalStorage('enabled_exchanges', { vest: true, lighter: true, paradex: true });
   const [pairThresholds, setPairThresholds] = useLocalStorage('pair_thresholds', {});
   const [disabledAlarms, setDisabledAlarms] = useLocalStorage('disabled_alarms', []);
@@ -62,9 +60,9 @@ function App() {
   const dynamicPairs = useMemo(() => pairs.map(p => ({ ...p, ...getDynamicSpread(p) })), [pairs, getDynamicSpread]);
   const monitoredCount = useMemo(() => dynamicPairs.filter(p => isMonitored(p.symbol)).length, [dynamicPairs, isMonitored]);
 
+  // Show all pairs, sorted by spread (alerting pairs first)
   const sortedData = useMemo(() => {
-    const data = isFocusMode ? dynamicPairs.filter(p => isMonitored(p.symbol)) : dynamicPairs;
-    return [...data].sort((a, b) => {
+    return [...dynamicPairs].sort((a, b) => {
       const aThreshold = getAlertThreshold(a.symbol);
       const bThreshold = getAlertThreshold(b.symbol);
       const aAlerting = isMonitored(a.symbol) && a.realSpread >= aThreshold;
@@ -73,7 +71,7 @@ function App() {
       if (!aAlerting && bAlerting) return 1;
       return (b.realSpread || -999) - (a.realSpread || -999);
     });
-  }, [dynamicPairs, isFocusMode, isMonitored, getAlertThreshold]);
+  }, [dynamicPairs, isMonitored, getAlertThreshold]);
 
   // --- Actions ---
   const addPosition = (pos) => setPositions(prev => [...prev, pos]);
@@ -106,7 +104,7 @@ function App() {
     });
   };
 
-  // --- Alarms Logic (Refactored to Custom Hook) ---
+  // --- Alarms Logic ---
   const {
     activeAlarm,
     activeScannerAlarm,
@@ -120,49 +118,13 @@ function App() {
     if (activeTab === 'scanner') {
       return (
         <>
-          {!isLoading && isFocusMode && monitoredCount === 0 && (
-            <div className="text-center py-20 bg-[#1a1d24] border border-dashed border-gray-800 rounded-3xl animate-in fade-in zoom-in-95 duration-300">
-              <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Target className="w-8 h-8 text-blue-400" />
-              </div>
-              <h3 className="text-xl font-black text-white mb-2 uppercase tracking-tight">No monitored pairs yet</h3>
-              <p className="text-gray-500 text-sm mb-6 max-w-md mx-auto">Click <span className="text-gray-300">⚙️</span> on any pair to set a custom alert threshold and focus on what matters.</p>
-              <button
-                onClick={() => setIsFocusMode(false)}
-                className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 shadow-lg shadow-blue-500/20"
-              >
-                Disable Focus Mode
-              </button>
-            </div>
-          )}
-
-          {!isLoading && sortedData.length === 0 && !isFocusMode && !error && (
+          {!isLoading && sortedData.length === 0 && !error && (
             <div className="text-center py-32 opacity-50">
               <p className="text-2xl font-light">No opportunities found.</p>
             </div>
           )}
 
-          {isFocusMode && monitoredCount > 0 && (
-            <div className="flex items-center gap-3 mb-6 bg-blue-500/10 border border-blue-500/20 p-3 rounded-2xl animate-in slide-in-from-top-2 duration-300">
-              <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
-                <Target className="w-4 h-4 text-white" />
-              </div>
-              <p className="text-sm font-bold text-blue-100 uppercase tracking-tight">
-                Focus Mode: <span className="text-blue-400">Showing {monitoredCount} monitored pairs</span>
-              </p>
-              <button
-                onClick={() => setIsFocusMode(false)}
-                className="ml-auto p-1.5 hover:bg-white/10 rounded-lg transition-all text-blue-400"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          )}
-
-          <div className={isFocusMode
-            ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
-            : "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5"
-          }>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             <AnimatePresence mode="popLayout">
               {sortedData.map((row, i) => (
                 <OpportunityCard
@@ -176,7 +138,6 @@ function App() {
                   hasCustomThreshold={pairThresholds.hasOwnProperty(row.symbol)}
                   updateThreshold={updateThreshold}
                   minSpread={minSpread}
-                  isFocusMode={isFocusMode}
                 />
               ))}
             </AnimatePresence>
@@ -217,8 +178,6 @@ function App() {
         refresh={refresh}
         isLoading={isLoading}
         onAddPosition={() => setIsAddModalOpen(true)}
-        isFocusMode={isFocusMode}
-        setIsFocusMode={setIsFocusMode}
         monitoredCount={monitoredCount}
         onOpenAlarms={() => setIsActiveAlarmsModalOpen(true)}
       />
@@ -274,4 +233,3 @@ function App() {
 }
 
 export default App;
-

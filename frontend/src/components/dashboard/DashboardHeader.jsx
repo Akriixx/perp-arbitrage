@@ -1,4 +1,4 @@
-import { RefreshCw, PlusCircle, LayoutDashboard, Briefcase, Bell, BarChart3, Target } from 'lucide-react';
+import { RefreshCw, PlusCircle, LayoutDashboard, Briefcase, Bell, BarChart3 } from 'lucide-react';
 
 export default function DashboardHeader({
     activeTab,
@@ -10,8 +10,6 @@ export default function DashboardHeader({
     refresh,
     isLoading,
     onAddPosition,
-    isFocusMode,
-    setIsFocusMode,
     monitoredCount,
     onOpenAlarms
 }) {
@@ -57,31 +55,6 @@ export default function DashboardHeader({
                         </button>
                     </div>
 
-                    {/* Focus Mode Toggle */}
-                    <div className="flex items-center gap-2 px-3 border-r border-gray-800 mr-1">
-                        <button
-                            onClick={() => setIsFocusMode(!isFocusMode)}
-                            className={`
-                                flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black transition-all duration-300
-                                ${isFocusMode
-                                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20'
-                                    : 'bg-gray-800/50 text-gray-500 hover:text-gray-300'
-                                }
-                            `}
-                        >
-                            <Target className={`w-3.5 h-3.5 ${isFocusMode ? 'animate-pulse' : ''}`} />
-                            FOCUS MODE ({monitoredCount})
-                            <div className={`
-                                w-7 h-4 rounded-full p-0.5 transition-colors duration-300
-                                ${isFocusMode ? 'bg-indigo-400' : 'bg-gray-700'}
-                            `}>
-                                <div className={`
-                                    w-3 h-3 bg-white rounded-full transition-transform duration-300
-                                    ${isFocusMode ? 'translate-x-3' : 'translate-x-0'}
-                                `} />
-                            </div>
-                        </button>
-                    </div>
                     <button
                         onClick={() => setActiveTab('scanner')}
                         className={`
@@ -119,6 +92,9 @@ export default function DashboardHeader({
                         title="Manage Active Alarms"
                     >
                         <Bell className="w-4 h-4" />
+                        {monitoredCount > 0 && (
+                            <span className="text-xs font-bold text-blue-400">({monitoredCount})</span>
+                        )}
                     </button>
                     <div className="h-6 w-[1px] bg-gray-800 mx-2"></div>
 
