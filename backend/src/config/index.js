@@ -9,15 +9,15 @@ module.exports = {
     CONCURRENCY: 5,              // Max parallel API requests
     REQUEST_TIMEOUT: 10000,      // 10 seconds
 
-    // Simulation Configuration (V3 Ghost Mode)
+    // Simulation Configuration (V3 Ghost Mode) - PAUSED
     SIMULATION: {
-        ENABLED: true,                                          // Enable/disable simulation
+        ENABLED: false,                                         // DISABLED - Observation mode only
         POSITION_SIZE_USD: Number(process.env.SIM_POSITION_SIZE) || 1000,
-        GOLDEN_THRESHOLD_PERCENT: Number(process.env.GOLDEN_THRESHOLD_PERCENT) || 0.5,  // Alert if net profit > 0.5%
-        SLIPPAGE_PERCENT: Number(process.env.SIM_SLIPPAGE) || 0.1,  // Conservative 0.1% slippage
-        MIN_SPREAD_PERCENT: 0.15,                              // Minimum spread to simulate
-        MIN_DURATION_MS: 600,                                  // Spread must last 600ms+ to be capturable
-        DASHBOARD_INTERVAL: 30000,                             // Print dashboard every 30s
+        GOLDEN_THRESHOLD_PERCENT: Number(process.env.GOLDEN_THRESHOLD_PERCENT) || 0.5,
+        SLIPPAGE_PERCENT: Number(process.env.SIM_SLIPPAGE) || 0.1,
+        MIN_SPREAD_PERCENT: 0.15,
+        MIN_DURATION_MS: 600,
+        DASHBOARD_INTERVAL: 30000,
     },
 
     COMMON_HEADERS: {

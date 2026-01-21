@@ -12,7 +12,8 @@ const { ALLOWED_SYMBOLS } = require('../config');
 const { saveSpread } = require('../db/database');
 const { saveAlert } = require('./alert.service');
 const { logger } = require('../utils/logger');
-const liveSimulation = require('./LiveSimulationEngine');
+// V3 Ghost Mode - PAUSED (uncomment to reactivate)
+// const liveSimulation = require('./LiveSimulationEngine');
 
 const TAG = 'Aggregator';
 
@@ -113,14 +114,15 @@ function updateAndRecalculate() {
         return isFresh(data.timestamp);
     });
 
-    // Save to DB, check for alerts, and run simulation
+    // Save to DB, check for alerts
+    // V3 Ghost Mode - PAUSED (uncomment to reactivate simulation)
     Object.values(PRICE_CACHE).forEach(pair => {
-        // V3 Ghost Mode: Process spread for simulation
-        liveSimulation.processSpread(pair.symbol, {
-            vest: pair.vest,
-            lighter: pair.lighter,
-            paradex: pair.paradex
-        });
+        // V3 Ghost Mode: Process spread for simulation - DISABLED
+        // liveSimulation.processSpread(pair.symbol, {
+        //     vest: pair.vest,
+        //     lighter: pair.lighter,
+        //     paradex: pair.paradex
+        // });
 
         if (pair.bestBid > 0 && pair.bestAsk > 0) {
             const lastSave = lastDbSave.get(pair.symbol) || 0;
@@ -223,10 +225,12 @@ function getStats() {
 }
 
 /**
- * Start all services (V2: WebSocket-primary + V3 Ghost Mode)
+ * Start all services (V2: WebSocket-primary)
+ * Note: V3 Ghost Mode simulation is PAUSED
  */
 async function startScheduler() {
     logger.info(TAG, 'Starting V2 services (WebSocket-primary with REST fallback)...');
+    logger.info(TAG, '📡 Bot is running in OBSERVATION MODE - Simulation Paused');
 
     // Initialize cache
     PRICE_CACHE = {};
@@ -235,8 +239,8 @@ async function startScheduler() {
     });
     logger.info(TAG, `Initialized cache with ${Object.keys(PRICE_CACHE).length} symbols`);
 
-    // V3: Initialize Ghost Mode simulation engine
-    liveSimulation.init();
+    // V3: Ghost Mode simulation engine - PAUSED
+    // liveSimulation.init();
 
     // Start Paradex WebSocket (already WS-only)
     paradexWS = new ParadexWebSocketService();
