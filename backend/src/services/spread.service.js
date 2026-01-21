@@ -1,17 +1,31 @@
 /**
  * Spread Calculation Service
  * Calculates arbitrage opportunities between exchanges
+ * V2: Supports stale data filtering via validator function
  */
 
 const EXCHANGES = ['vest', 'lighter', 'paradex'];
+
+// Default: 30 seconds staleness threshold
+const STALE_THRESHOLD = 30000;
 
 module.exports = {
     /**
      * Calculate spread and profit for all pairs
      * @param {Object} cache - Price cache with all pairs
+     * @param {Function} [validator] - Optional function to validate if exchange data is fresh
+     *                               Signature: (exchangeName, data) => boolean
      * @returns {Object} Cache with spread calculations added
      */
-    calculateSpreads: function (cache) {
+    calculateSpreads: function (cache, validator = null) {
+        const now = Date.now();
+
+        // Default validator: check timestamp if present
+        const isValid = validator || ((ex, data) => {
+            if (!data.timestamp) return true; // No timestamp = assume valid (backward compat)
+            return (now - data.timestamp) <= STALE_THRESHOLD;
+        });
+
         Object.values(cache).forEach((item) => {
             let maxBid = 0;
             let maxBidEx = null;
@@ -19,8 +33,16 @@ module.exports = {
             let minAskEx = null;
 
             // Find best bid (highest) and best ask (lowest)
+            // Only use fresh (non-stale) data
             EXCHANGES.forEach((ex) => {
                 const exchangeData = item[ex];
+                if (!exchangeData) return;
+
+                // Skip stale data
+                if (!isValid(ex, exchangeData)) {
+                    return;
+                }
+
                 const bid = exchangeData?.bid || 0;
                 const ask = exchangeData?.ask || 0;
 

@@ -1,13 +1,16 @@
 /**
  * Core Types for Perp Arbitrage Scanner
+ * V2: Added timestamps for stale data detection
  */
 
 /**
- * Exchange price data (bid/ask)
+ * Exchange price data (bid/ask) with optional timestamp
  */
 export interface ExchangePrice {
     bid: number;
     ask: number;
+    timestamp?: number;  // V2: When this data was received
+    source?: 'ws' | 'rest' | 'none';  // V2: Data source
 }
 
 /**
@@ -66,4 +69,25 @@ export interface Config {
     CONCURRENCY: number;
     REQUEST_TIMEOUT: number;
     COMMON_HEADERS: Record<string, string>;
+}
+
+/**
+ * V2: Timestamped price data
+ */
+export interface TimestampedPrice {
+    symbol: string;
+    bid: number;
+    ask: number;
+    timestamp: number;
+    source: 'ws' | 'rest';
+}
+
+/**
+ * V2: Service statistics
+ */
+export interface ServiceStats {
+    fresh: number;
+    stale: number;
+    wsActive: boolean;
+    fallbackActive: boolean;
 }

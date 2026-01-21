@@ -1,11 +1,12 @@
 /**
- * Market Data Aggregator Service (WebSocket Version)
- * Combines real-time data from WebSocket streams and manages the price cache
+ * Market Data Aggregator Service (V2 - Full WebSocket)
+ * Uses WebSocket-primary with REST fallback for all exchanges
+ * Includes timestamp tracking and stale data detection
  */
 
 const ParadexWebSocketService = require('./paradex.websocket');
-const { fetchLighterMarkets } = require('./lighter.service');
-const { fetchVestMarkets } = require('./vest.service');
+const { vestHybridService } = require('./exchanges/VestHybridService');
+const { lighterHybridService } = require('./exchanges/LighterHybridService');
 const { calculateSpreads } = require('./spread.service');
 const { ALLOWED_SYMBOLS } = require('../config');
 const { saveSpread } = require('../db/database');
@@ -16,35 +17,35 @@ const TAG = 'Aggregator';
 
 // Constants
 const ALERT_THRESHOLD = 0.5; // Log alerts for spreads > 0.5%
+const STALE_THRESHOLD = 30000; // 30 seconds - data older than this is invalid
 
-// Global price cache
+// Global price cache with timestamps
 let PRICE_CACHE = {};
 
 // WebSocket broadcaster (set by index.js)
 let wsBroadcaster = null;
 
-// WebSocket instances
+// Service instances
 let paradexWS = null;
-let vestInterval = null;
-let lighterInterval = null;
 
 // Track last DB save per symbol to prevent bloat
 const lastDbSave = new Map();
-const DB_SAVE_THROTTLE = 5000; // 5 seconds (Increased for higher resolution 24h chart)
-// Throttled broadcast state
+const DB_SAVE_THROTTLE = 5000;
+
+// Throttled broadcast state  
 let lastBroadcastTime = 0;
-const BROADCAST_THROTTLE = 1000; // Max 1 broadcast per second
+const BROADCAST_THROTTLE = 1000;
 let broadcastPending = false;
 
 /**
- * Create empty pair structure
+ * Create empty pair structure with timestamps
  */
 function createPair(symbol) {
     return {
         symbol,
-        vest: { bid: 0, ask: 0 },
-        lighter: { bid: 0, ask: 0 },
-        paradex: { bid: 0, ask: 0 }
+        vest: { bid: 0, ask: 0, timestamp: 0, source: 'none' },
+        lighter: { bid: 0, ask: 0, timestamp: 0, source: 'none' },
+        paradex: { bid: 0, ask: 0, timestamp: 0, source: 'none' }
     };
 }
 
@@ -58,6 +59,13 @@ function ensurePair(symbol) {
         PRICE_CACHE[symbol] = createPair(symbol);
     }
     return PRICE_CACHE[symbol];
+}
+
+/**
+ * Check if price data is fresh (not stale)
+ */
+function isFresh(timestamp) {
+    return timestamp > 0 && (Date.now() - timestamp) <= STALE_THRESHOLD;
 }
 
 /**
@@ -92,15 +100,20 @@ function performBroadcast() {
 
 /**
  * Update cache and recalculate spreads
+ * Only uses fresh data (not stale)
  */
 function updateAndRecalculate() {
-    calculateSpreads(PRICE_CACHE);
+    const now = Date.now();
+
+    // Calculate spreads using only fresh data
+    calculateSpreads(PRICE_CACHE, (exchange, data) => {
+        // Validator function: only use fresh data
+        return isFresh(data.timestamp);
+    });
 
     // Save to DB and check for alerts
     Object.values(PRICE_CACHE).forEach(pair => {
         if (pair.bestBid > 0 && pair.bestAsk > 0) {
-            // Save metric (Throttled: Max once per minute per symbol)
-            const now = Date.now();
             const lastSave = lastDbSave.get(pair.symbol) || 0;
 
             if (now - lastSave >= DB_SAVE_THROTTLE) {
@@ -115,15 +128,12 @@ function updateAndRecalculate() {
                 lastDbSave.set(pair.symbol, now);
             }
 
-
-            // Check for Alert
             if (pair.realSpread >= ALERT_THRESHOLD) {
                 saveAlert(pair).catch(err => logger.error(TAG, 'Failed to save alert', err));
             }
         }
     });
 
-    // Event-driven broadcast
     throttledBroadcast();
 }
 
@@ -131,64 +141,55 @@ function updateAndRecalculate() {
  * Handle Paradex WebSocket data
  */
 function handleParadexData(markets) {
+    const now = Date.now();
+
     markets.forEach(({ symbol, bid, ask }) => {
         const pair = ensurePair(symbol);
         if (!pair) return;
 
         pair.paradex.bid = bid;
         pair.paradex.ask = ask;
+        pair.paradex.timestamp = now;
+        pair.paradex.source = 'ws';
     });
 
     updateAndRecalculate();
 }
 
 /**
- * Fetch Vest data (REST - poll every 2 seconds)
+ * Handle Vest hybrid service updates (WS or REST)
  */
-async function updateVestData() {
-    try {
-        const vestData = await fetchVestMarkets();
+function handleVestUpdate(data) {
+    const pair = ensurePair(data.symbol);
+    if (!pair) return;
 
-        vestData.forEach(({ symbol, bid, ask }) => {
-            const pair = ensurePair(symbol);
-            if (!pair) return;
+    pair.vest.bid = data.bid;
+    pair.vest.ask = data.ask;
+    pair.vest.timestamp = data.timestamp;
+    pair.vest.source = data.source;
 
-            pair.vest.bid = bid;
-            pair.vest.ask = ask;
-        });
-
-        updateAndRecalculate();
-    } catch (error) {
-        logger.error(TAG, 'Error fetching Vest data', error);
-    }
+    updateAndRecalculate();
 }
 
 /**
- * Fetch Lighter data (REST - poll every 2 seconds)
+ * Handle Lighter hybrid service updates (WS or REST)
  */
-async function updateLighterData() {
-    try {
-        const lighterData = await fetchLighterMarkets();
+function handleLighterUpdate(data) {
+    const pair = ensurePair(data.symbol);
+    if (!pair) return;
 
-        lighterData.forEach(({ symbol, bid, ask }) => {
-            const pair = ensurePair(symbol);
-            if (!pair) return;
+    pair.lighter.bid = data.bid;
+    pair.lighter.ask = data.ask;
+    pair.lighter.timestamp = data.timestamp;
+    pair.lighter.source = data.source;
 
-            pair.lighter.bid = bid;
-            pair.lighter.ask = ask;
-        });
-
-        updateAndRecalculate();
-    } catch (error) {
-        logger.error(TAG, 'Error fetching Lighter data', error);
-    }
+    updateAndRecalculate();
 }
 
 /**
- * Get current price cache
+ * Get current price cache (filtered for allowed symbols)
  */
 function getPriceCache() {
-    // Filter to ensure only currently allowed symbols are returned
     const filtered = {};
     ALLOWED_SYMBOLS.forEach(symbol => {
         if (PRICE_CACHE[symbol]) {
@@ -199,68 +200,69 @@ function getPriceCache() {
 }
 
 /**
- * Start WebSocket connections and schedulers
+ * Get service statistics
  */
-function startScheduler() {
-    logger.info(TAG, 'Starting services...');
+function getStats() {
+    const vestStats = vestHybridService.getStats();
+    const lighterStats = lighterHybridService.getStats();
 
-    // Initialize cache with ONLY allowed symbols (Clear any previous stale data)
+    return {
+        vest: vestStats,
+        lighter: lighterStats,
+        paradex: { wsActive: paradexWS?.isConnected || false }
+    };
+}
+
+/**
+ * Start all services (V2: WebSocket-primary)
+ */
+async function startScheduler() {
+    logger.info(TAG, 'Starting V2 services (WebSocket-primary with REST fallback)...');
+
+    // Initialize cache
     PRICE_CACHE = {};
     ALLOWED_SYMBOLS.forEach(symbol => {
         PRICE_CACHE[symbol] = createPair(symbol);
     });
-    logger.info(TAG, `Initialized cache with ${Object.keys(PRICE_CACHE).length} symbols: ${ALLOWED_SYMBOLS.join(', ')}`);
+    logger.info(TAG, `Initialized cache with ${Object.keys(PRICE_CACHE).length} symbols`);
 
-
-    // Start Paradex WebSocket
+    // Start Paradex WebSocket (already WS-only)
     paradexWS = new ParadexWebSocketService();
     paradexWS.on('data', handleParadexData);
     paradexWS.on('error', (error) => {
         logger.error(TAG, 'Paradex WebSocket error', error);
     });
     paradexWS.connect();
+    logger.info(TAG, 'Paradex WebSocket started');
 
-    // Start Lighter REST polling (2 seconds interval for faster updates)
-    logger.info(TAG, 'Starting Lighter REST polling (2s)');
-    updateLighterData(); // Initial fetch
-    if (lighterInterval) clearInterval(lighterInterval);
-    lighterInterval = setInterval(updateLighterData, 2000);
+    // Start Vest Hybrid Service (WS + REST fallback)
+    vestHybridService.on('update', handleVestUpdate);
+    await vestHybridService.start();
+    logger.info(TAG, 'Vest Hybrid Service started (WS primary, REST fallback)');
 
-    // Start Vest REST polling (2 seconds interval for faster updates)
-    logger.info(TAG, 'Starting Vest REST polling (2s)');
-    updateVestData(); // Initial fetch
-    if (vestInterval) clearInterval(vestInterval);
-    vestInterval = setInterval(updateVestData, 2000);
+    // Start Lighter Hybrid Service (WS + REST fallback)
+    lighterHybridService.on('update', handleLighterUpdate);
+    await lighterHybridService.start();
+    logger.info(TAG, 'Lighter Hybrid Service started (WS primary, REST fallback)');
 
-    // FIXED: Broadcaster is now event-driven via throttledBroadcast() in updateAndRecalculate()
-    logger.info(TAG, 'All services started');
+    logger.info(TAG, '✓ All V2 services started - Full WebSocket mode active');
 }
 
 /**
- * Stop all connections and schedulers
+ * Stop all services
  */
 function stopScheduler() {
-    logger.info(TAG, 'Stopping all connections...');
+    logger.info(TAG, 'Stopping all services...');
 
     if (paradexWS) {
         paradexWS.disconnect();
         paradexWS = null;
     }
 
-    if (lighterInterval) {
-        clearInterval(lighterInterval);
-        lighterInterval = null;
-    }
+    vestHybridService.stop();
+    lighterHybridService.stop();
 
-    if (vestInterval) {
-        clearInterval(vestInterval);
-        vestInterval = null;
-    }
-
-    if (global.broadcastInterval) {
-        clearInterval(global.broadcastInterval);
-        global.broadcastInterval = null;
-    }
+    logger.info(TAG, 'All services stopped');
 }
 
 /**
@@ -276,5 +278,6 @@ module.exports = {
     startScheduler,
     stopScheduler,
     setWebSocketBroadcaster,
-    getScans: getPriceCache
+    getScans: getPriceCache,
+    getStats
 };
