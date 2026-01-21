@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { X, Target } from 'lucide-react';
 import DetailView from './components/dashboard/DetailView';
@@ -11,91 +11,32 @@ import ScannerAlarmModal from './components/dashboard/ScannerAlarmModal';
 import TrackRecordTab from './components/track/TrackRecordTab';
 import useMarketData from './hooks/useMarketData';
 import { useAlerts } from './hooks/useAlerts';
-
-// Sound URLs
-const ALERT_SOUND_URL = "https://assets.mixkit.co/active_storage/sfx/933/933-preview.mp3";
-const EXIT_ALARM_URL = "https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3"; // Different sound for exit
+import { useLocalStorage } from './hooks/useLocalStorage';
+import { useAppAlarms } from './hooks/useAppAlarms';
 
 function App() {
   const [activeTab, setActiveTab] = useState('scanner');
   const [selectedPair, setSelectedPair] = useState(null);
   const [settingsOpenFor, setSettingsOpenFor] = useState(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [activeAlarm, setActiveAlarm] = useState(null);
-  const [activeScannerAlarm, setActiveScannerAlarm] = useState(null);
-  const [acknowledgedScannerAlarms, setAcknowledgedScannerAlarms] = useState(new Set());
-  const [isFocusMode, setIsFocusMode] = useState(() => {
-    try {
-      const saved = localStorage.getItem('is_focus_mode');
-      return saved ? JSON.parse(saved) : false;
-    } catch (e) { return false; }
-  });
 
-  const [enabledExchanges, setEnabledExchanges] = useState(() => {
-    try {
-      const saved = localStorage.getItem('enabled_exchanges');
-      return saved ? JSON.parse(saved) : { vest: true, lighter: true, paradex: true };
-    } catch (e) { return { vest: true, lighter: true, paradex: true }; }
-  });
+  // --- State with Persistence (Refactored to useLocalStorage) ---
+  const [isFocusMode, setIsFocusMode] = useLocalStorage('is_focus_mode', false);
+  const [enabledExchanges, setEnabledExchanges] = useLocalStorage('enabled_exchanges', { vest: true, lighter: true, paradex: true });
+  const [pairThresholds, setPairThresholds] = useLocalStorage('pair_thresholds', {});
+  const [trades, setTrades] = useLocalStorage('track_trades', []);
+  const [initialInvestment, setInitialInvestment] = useLocalStorage('initial_investment', 1000);
+  const [positions, setPositions] = useLocalStorage('active_positions', []);
 
-  const [pairThresholds, setPairThresholds] = useState(() => {
-    try {
-      const saved = localStorage.getItem('pair_thresholds');
-      return saved ? JSON.parse(saved) : {};
-    } catch (e) { return {}; }
-  });
-
-  const [trades, setTrades] = useState(() => {
-    try {
-      const saved = localStorage.getItem('track_trades');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) { return []; }
-  });
-
-  const [initialInvestment, setInitialInvestment] = useState(() => {
-    try {
-      const saved = localStorage.getItem('initial_investment');
-      return saved ? parseFloat(saved) : 1000;
-    } catch (e) { return 1000; }
-  });
-
-  const [positions, setPositions] = useState(() => {
-    try {
-      const saved = localStorage.getItem('active_positions');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) { return []; }
-  });
-
+  // --- Hooks and Data ---
   const { pairs, isLoading, error, refresh, refreshInterval, setRefreshInterval } = useMarketData();
   const { minSpread, soundEnabled } = useAlerts();
 
-  // Helper functions (moved up)
+  // Helper functions
   const isMonitored = useCallback((symbol) => pairThresholds.hasOwnProperty(symbol), [pairThresholds]);
   const getAlertThreshold = useCallback((symbol) => pairThresholds[symbol] !== undefined ? pairThresholds[symbol] : minSpread, [pairThresholds, minSpread]);
 
-  // Effects
-  useEffect(() => {
-    localStorage.setItem('is_focus_mode', JSON.stringify(isFocusMode));
-    if (isFocusMode && selectedPair && !isMonitored(selectedPair.symbol)) {
-      setSelectedPair(null);
-    }
-  }, [isFocusMode, selectedPair, isMonitored]);
-
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
-      if (e.key.toLowerCase() === 'f') setIsFocusMode(prev => !prev);
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  useEffect(() => { localStorage.setItem('active_positions', JSON.stringify(positions)); }, [positions]);
-  useEffect(() => { localStorage.setItem('track_trades', JSON.stringify(trades)); }, [trades]);
-  useEffect(() => { localStorage.setItem('initial_investment', initialInvestment.toString()); }, [initialInvestment]);
-  useEffect(() => { localStorage.setItem('enabled_exchanges', JSON.stringify(enabledExchanges)); }, [enabledExchanges]);
-  useEffect(() => { localStorage.setItem('pair_thresholds', JSON.stringify(pairThresholds)); }, [pairThresholds]);
-
+  // Derived Data: Dynamic Spreads
   const getDynamicSpread = useCallback((pair) => {
     let maxBid = 0, maxBidEx = null;
     let minAsk = Infinity, minAskEx = null;
@@ -114,7 +55,7 @@ function App() {
     return { realSpread: -999, bestBid: 0, bestAsk: 0, bestBidEx: null, bestAskEx: null };
   }, [enabledExchanges]);
 
-  // Memoized derived data
+  // Memoized Data
   const dynamicPairs = useMemo(() => pairs.map(p => ({ ...p, ...getDynamicSpread(p) })), [pairs, getDynamicSpread]);
   const monitoredCount = useMemo(() => dynamicPairs.filter(p => isMonitored(p.symbol)).length, [dynamicPairs, isMonitored]);
 
@@ -131,72 +72,16 @@ function App() {
     });
   }, [dynamicPairs, isFocusMode, isMonitored, getAlertThreshold]);
 
-  // Alert Sounds
-  const playSound = (url) => {
-    if (!soundEnabled) return;
-    try {
-      const audio = new Audio(url);
-      audio.volume = 0.5;
-      audio.play().catch(e => console.warn("Audio play failed", e));
-    } catch (e) { }
+  // --- Actions ---
+  const addPosition = (pos) => setPositions(prev => [...prev, pos]);
+  const removePosition = (id) => setPositions(prev => prev.filter(p => p.id !== id));
+  const updatePosition = (id, updates) => {
+    setPositions(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
   };
 
-  // Main Alert Detection Effect
-  useEffect(() => {
-    if (!dynamicPairs || dynamicPairs.length === 0) return;
-
-    // 1. Scanner Alarms (Detect new ones)
-    if (!activeScannerAlarm) {
-      for (const pair of dynamicPairs) {
-        const spread = pair.realSpread || 0;
-        const threshold = pairThresholds[pair.symbol] !== undefined ? pairThresholds[pair.symbol] : minSpread;
-        const isCustom = pairThresholds.hasOwnProperty(pair.symbol);
-
-        // Only trigger if custom threshold is set (per user's previous preference)
-        if (isCustom && spread >= threshold && !acknowledgedScannerAlarms.has(pair.symbol)) {
-          setActiveScannerAlarm(pair);
-          break;
-        }
-
-        // Auto-reset acknowledgment if spread falls below threshold
-        if (acknowledgedScannerAlarms.has(pair.symbol) && spread < threshold) {
-          setAcknowledgedScannerAlarms(prev => {
-            const next = new Set(prev);
-            next.delete(pair.symbol);
-            return next;
-          });
-        }
-      }
-    }
-
-    // 2. Position Convergence Alarms
-    if (!activeAlarm) {
-      for (const pos of positions) {
-        const livePair = dynamicPairs.find(p => p.symbol === pos.symbol);
-        if (livePair && livePair.realSpread !== -999 && livePair.realSpread <= pos.exitTargetSpread) {
-          if (!pos.lastAlarmTriggered || pos.lastAlarmTriggered !== pos.exitTargetSpread) {
-            setActiveAlarm(pos);
-            updatePosition(pos.id, { lastAlarmTriggered: pos.exitTargetSpread });
-            break;
-          }
-        }
-      }
-    }
-  }, [dynamicPairs, pairThresholds, minSpread, positions, activeAlarm, activeScannerAlarm, acknowledgedScannerAlarms]);
-
-  // Repeating alarm sound for Scanner
-  useEffect(() => {
-    if (!activeScannerAlarm || !soundEnabled) return;
-
-    playSound(ALERT_SOUND_URL);
-    const soundInterval = setInterval(() => {
-      playSound(ALERT_SOUND_URL);
-    }, 10000);
-
-    return () => clearInterval(soundInterval);
-  }, [activeScannerAlarm?.symbol, soundEnabled]);
-
-
+  const addTrade = (trade) => setTrades(prev => [trade, ...prev]);
+  const removeTrade = (id) => setTrades(prev => prev.filter(t => t.id !== id));
+  const updateInvestment = (value) => setInitialInvestment(parseFloat(value) || 0);
 
   const updateThreshold = (symbol, newValue) => {
     setPairThresholds(prev => {
@@ -208,42 +93,16 @@ function App() {
     setSettingsOpenFor(null);
   };
 
-  const addPosition = (pos) => setPositions(prev => [...prev, pos]);
-  const removePosition = (id) => setPositions(prev => prev.filter(p => p.id !== id));
-  const updatePosition = (id, updates) => {
-    setPositions(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
-  };
-
-  // Repeating alarm sound for Position Exit
-  useEffect(() => {
-    if (!activeAlarm || !soundEnabled) return;
-
-    playSound(EXIT_ALARM_URL);
-    const soundInterval = setInterval(() => {
-      playSound(EXIT_ALARM_URL);
-    }, 10000);
-
-    return () => clearInterval(soundInterval);
-  }, [activeAlarm?.id, soundEnabled]);
-
-  const addTrade = (trade) => setTrades(prev => [trade, ...prev]);
-  const removeTrade = (id) => setTrades(prev => prev.filter(t => t.id !== id));
-  const updateInvestment = (value) => setInitialInvestment(parseFloat(value) || 0);
-
-  const stopAlarm = () => setActiveAlarm(null);
-  const stopScannerAlarm = () => {
-    if (activeScannerAlarm) {
-      setAcknowledgedScannerAlarms(prev => {
-        const next = new Set(prev);
-        next.add(activeScannerAlarm.symbol);
-        return next;
-      });
-      setActiveScannerAlarm(null);
-    }
-  };
+  // --- Alarms Logic (Refactored to Custom Hook) ---
+  const {
+    activeAlarm,
+    activeScannerAlarm,
+    stopAlarm,
+    stopScannerAlarm
+  } = useAppAlarms(dynamicPairs, pairThresholds, minSpread, positions, updatePosition, soundEnabled);
 
 
-
+  // --- Render ---
   const renderContent = () => {
     if (activeTab === 'scanner') {
       return (

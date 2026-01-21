@@ -1,89 +1,64 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
-/**
- * WebSocket Hook for Real-Time Price Updates
- * Connects to backend WebSocket server for instant price data
- */
-export function useWebSocket(url = 'ws://localhost:3000') {
-    const [data, setData] = useState(null);
+export function useWebSocket(url, onMessage) {
     const [isConnected, setIsConnected] = useState(false);
     const [error, setError] = useState(null);
-    const wsRef = useRef(null);
-    const reconnectTimeoutRef = useRef(null);
+    const ws = useRef(null);
+    const reconnectTimeout = useRef(null);
 
-    useEffect(() => {
-        let isMounted = true;
+    const connect = useCallback(() => {
+        if (ws.current?.readyState === WebSocket.OPEN) return;
 
-        function connect() {
+        console.log('[WebSocket] Connecting to:', url);
+        ws.current = new WebSocket(url);
+
+        ws.current.onopen = () => {
+            console.log('[WebSocket] Connected');
+            setIsConnected(true);
+            setError(null);
+        };
+
+        ws.current.onmessage = (event) => {
             try {
-                console.log('[WebSocket] Connecting to', url);
-                const ws = new WebSocket(url);
-                wsRef.current = ws;
-
-                ws.onopen = () => {
-                    if (!isMounted) return;
-                    console.log('[WebSocket] Connected');
-                    setIsConnected(true);
-                    setError(null);
-                };
-
-                ws.onmessage = (event) => {
-                    if (!isMounted) return;
-                    try {
-                        const message = JSON.parse(event.data);
-                        if (message.type === 'update' || message.type === 'initial') {
-                            setData(message.pairs);
-                        }
-                    } catch (err) {
-                        console.error('[WebSocket] Parse error:', err);
-                    }
-                };
-
-                ws.onerror = (err) => {
-                    if (!isMounted) return;
-                    console.error('[WebSocket] Error:', err);
-                    setError('WebSocket connection error');
-                };
-
-                ws.onclose = () => {
-                    if (!isMounted) return;
-                    console.log('[WebSocket] Disconnected');
-                    setIsConnected(false);
-
-                    // Auto-reconnect after 3 seconds
-                    reconnectTimeoutRef.current = setTimeout(() => {
-                        if (isMounted) {
-                            console.log('[WebSocket] Attempting to reconnect...');
-                            connect();
-                        }
-                    }, 3000);
-                };
-
+                const data = JSON.parse(event.data);
+                if (onMessage) onMessage(data);
             } catch (err) {
-                console.error('[WebSocket] Connection error:', err);
-                setError(err.message);
-            }
-        }
-
-        connect();
-
-        // Cleanup
-        return () => {
-            isMounted = false;
-            if (reconnectTimeoutRef.current) {
-                clearTimeout(reconnectTimeoutRef.current);
-            }
-            if (wsRef.current) {
-                wsRef.current.close();
+                console.error('[WebSocket] Failed to parse message:', err);
             }
         };
-    }, [url]);
 
-    return {
-        data,
-        isConnected,
-        error
-    };
+        ws.current.onclose = () => {
+            console.log('[WebSocket] Disconnected');
+            setIsConnected(false);
+            // Reconnect after 3 seconds
+            reconnectTimeout.current = setTimeout(connect, 3000);
+        };
+
+        ws.current.onerror = (err) => {
+            console.error('[WebSocket] Error:', err);
+            setError('Connection error');
+            ws.current.close();
+        };
+    }, [url, onMessage]);
+
+    useEffect(() => {
+        connect();
+        return () => {
+            if (ws.current) {
+                ws.current.onclose = null; // Prevent reconnect on manual close
+                ws.current.close();
+            }
+            if (reconnectTimeout.current) clearTimeout(reconnectTimeout.current);
+        };
+    }, [connect]);
+
+    const sendMessage = useCallback((msg) => {
+        if (ws.current?.readyState === WebSocket.OPEN) {
+            ws.current.send(JSON.stringify(msg));
+        }
+    }, []);
+
+    return { isConnected, error, sendMessage };
 }
 
 export default useWebSocket;

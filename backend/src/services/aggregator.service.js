@@ -28,7 +28,10 @@ let lighterInterval = null;
 // Track last DB save per symbol to prevent bloat
 const lastDbSave = new Map();
 const DB_SAVE_THROTTLE = 5000; // 5 seconds (Increased for higher resolution 24h chart)
-
+// Throttled broadcast state
+let lastBroadcastTime = 0;
+const BROADCAST_THROTTLE = 1000; // Max 1 broadcast per second
+let broadcastPending = false;
 
 /**
  * Create empty pair structure
@@ -52,6 +55,36 @@ function ensurePair(symbol) {
         PRICE_CACHE[symbol] = createPair(symbol);
     }
     return PRICE_CACHE[symbol];
+}
+
+/**
+ * Throttled broadcast to clients
+ */
+function throttledBroadcast() {
+    if (broadcastPending) return;
+
+    const now = Date.now();
+    const timeSinceLast = now - lastBroadcastTime;
+
+    if (timeSinceLast >= BROADCAST_THROTTLE) {
+        performBroadcast();
+    } else {
+        broadcastPending = true;
+        setTimeout(() => {
+            performBroadcast();
+            broadcastPending = false;
+        }, BROADCAST_THROTTLE - timeSinceLast);
+    }
+}
+
+function performBroadcast() {
+    if (wsBroadcaster) {
+        const dataToBroadcast = getPriceCache();
+        if (Object.keys(dataToBroadcast).length > 0) {
+            wsBroadcaster(dataToBroadcast);
+            lastBroadcastTime = Date.now();
+        }
+    }
 }
 
 /**
@@ -87,10 +120,8 @@ function updateAndRecalculate() {
         }
     });
 
-
-
-    // NOTE: Broadcasting is now handled by a fixed interval in startScheduler
-    // to prevent flooding the frontend with micro-updates from Paradex WS
+    // Event-driven broadcast
+    throttledBroadcast();
 }
 
 /**
@@ -109,7 +140,7 @@ function handleParadexData(markets) {
 }
 
 /**
- * Fetch Vest data (REST - poll every 1 second)
+ * Fetch Vest data (REST - poll every 2 seconds)
  */
 async function updateVestData() {
     try {
@@ -186,31 +217,19 @@ function startScheduler() {
     });
     paradexWS.connect();
 
-    // Start Lighter REST polling (5 seconds interval)
-    console.log('[Aggregator] Starting Lighter REST polling (5s)');
+    // Start Lighter REST polling (2 seconds interval for faster updates)
+    console.log('[Aggregator] Starting Lighter REST polling (2s)');
     updateLighterData(); // Initial fetch
     if (lighterInterval) clearInterval(lighterInterval);
-    lighterInterval = setInterval(updateLighterData, 5000);
+    lighterInterval = setInterval(updateLighterData, 2000);
 
-    // Start Vest REST polling (5 seconds interval)
-    console.log('[Aggregator] Starting Vest REST polling (5s)');
+    // Start Vest REST polling (2 seconds interval for faster updates)
+    console.log('[Aggregator] Starting Vest REST polling (2s)');
     updateVestData(); // Initial fetch
     if (vestInterval) clearInterval(vestInterval);
-    vestInterval = setInterval(updateVestData, 5000);
+    vestInterval = setInterval(updateVestData, 2000);
 
-    // Start Broadcast Interval (5 seconds) - Throttling updates
-    console.log('[Aggregator] Starting Broadcast Interval (5s throttle)');
-    if (global.broadcastInterval) clearInterval(global.broadcastInterval);
-    global.broadcastInterval = setInterval(() => {
-        if (wsBroadcaster) {
-            const dataToBroadcast = getPriceCache();
-            if (Object.keys(dataToBroadcast).length > 0) {
-                wsBroadcaster(dataToBroadcast);
-            }
-        }
-    }, 5000);
-
-
+    // FIXED: Broadcaster is now event-driven via throttledBroadcast() in updateAndRecalculate()
     console.log('[Aggregator] All services started');
 }
 
