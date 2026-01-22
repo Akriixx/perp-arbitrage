@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowUpRight, Flame, TrendingUp, AlertTriangle, Pencil } from 'lucide-react';
+import { ArrowUpRight, Flame, TrendingUp, AlertTriangle, Pencil, Lock } from 'lucide-react';
 
 export default function ProfitCalculator({ spread, pair, exchangeAndPrice }) {
     // Configuration State with Persistence
@@ -8,16 +8,13 @@ export default function ProfitCalculator({ spread, pair, exchangeAndPrice }) {
         return saved ? parseFloat(saved) : 1000;
     });
 
-    const [totalCapital, setTotalCapital] = useState(() => {
-        const saved = localStorage.getItem('calc_total_capital');
-        return saved ? parseFloat(saved) : 2000;
-    });
+    // Total Capital is now derived: Margin per side * 2
+    const totalCapital = marginPerSide * 2;
 
-    // Save preferences on change
+    // Save preferences on change (Only margin needs to be saved)
     useEffect(() => {
         localStorage.setItem('calc_margin_per_side', marginPerSide);
-        localStorage.setItem('calc_total_capital', totalCapital);
-    }, [marginPerSide, totalCapital]);
+    }, [marginPerSide]);
 
     const PAIR_LEVERAGE = {
         'BTC': 50,
@@ -76,18 +73,21 @@ export default function ProfitCalculator({ spread, pair, exchangeAndPrice }) {
                             />
                         </div>
                     </div>
-                    <div className="flex justify-between items-center text-gray-400">
-                        <span className="flex items-center gap-1.5 group cursor-help">
+
+                    {/* Locked Total Capital Field */}
+                    <div className="flex justify-between items-center text-gray-500">
+                        <span className="flex items-center gap-1.5">
                             Total Capital
-                            <Pencil className="w-3 h-3 opacity-30 group-hover:opacity-100 transition-opacity" />
+                            <Lock className="w-3 h-3 opacity-30" />
                         </span>
-                        <div className="flex items-center bg-gray-900/50 rounded-lg px-2 border border-transparent hover:border-gray-600 focus-within:border-blue-500 transition-colors">
-                            <span className="text-gray-500 mr-1">$</span>
+                        <div className="flex items-center bg-gray-900/30 rounded-lg px-2 border border-transparent cursor-not-allowed">
+                            <span className="text-gray-600 mr-1">$</span>
                             <input
                                 type="number"
                                 value={totalCapital}
-                                onChange={(e) => setTotalCapital(parseFloat(e.target.value) || 0)}
-                                className="bg-transparent border-none text-right text-white font-mono w-20 focus:outline-none py-1"
+                                readOnly
+                                disabled
+                                className="bg-transparent border-none text-right text-gray-400 font-mono w-20 focus:outline-none py-1 cursor-not-allowed selection:bg-transparent"
                             />
                         </div>
                     </div>
