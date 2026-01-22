@@ -11,6 +11,7 @@ import ActiveAlarmsModal from './components/dashboard/ActiveAlarmsModal';
 import TrackRecordTab from './components/track/TrackRecordTab';
 import useMarketData from './hooks/useMarketData';
 import { useAlerts } from './hooks/useAlerts';
+import { useLocalStorage } from './hooks/useLocalStorage';
 import { useAppAlarms } from './hooks/useAppAlarms';
 
 
