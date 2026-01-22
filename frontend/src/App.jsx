@@ -14,6 +14,13 @@ import { useAlerts } from './hooks/useAlerts';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { useAppAlarms } from './hooks/useAppAlarms';
 
+const PAIR_LEVERAGE = {
+  'BTC': 50, 'ETH': 50, 'SOL': 20, 'PAXG': 10,
+  'AAVE': 10, 'SUI': 10, 'XRP': 10, 'GRASS': 5,
+  'MYX': 3, 'LIT': 5, 'RESOLV': 3, 'BERA': 5, 'KAITO': 5
+};
+
+
 function App() {
   const [activeTab, setActiveTab] = useState('scanner');
   const [selectedPair, setSelectedPair] = useState(null);
@@ -28,6 +35,7 @@ function App() {
   const [trades, setTrades] = useLocalStorage('track_trades', []);
   const [initialInvestment, setInitialInvestment] = useLocalStorage('initial_investment', 1000);
   const [positions, setPositions] = useLocalStorage('active_positions', []);
+  const [pairMargins, setPairMargins] = useLocalStorage('pair_margins', {});
 
   // --- Hooks and Data ---
   const { pairs, isLoading, error, refresh, refreshInterval, setRefreshInterval } = useMarketData();
@@ -60,18 +68,21 @@ function App() {
   const dynamicPairs = useMemo(() => pairs.map(p => ({ ...p, ...getDynamicSpread(p) })), [pairs, getDynamicSpread]);
   const monitoredCount = useMemo(() => dynamicPairs.filter(p => isMonitored(p.symbol)).length, [dynamicPairs, isMonitored]);
 
-  // Show all pairs, sorted by spread (alerting pairs first)
+  // Show all pairs, sorted by Estimated Profit
   const sortedData = useMemo(() => {
     return [...dynamicPairs].sort((a, b) => {
-      const aThreshold = getAlertThreshold(a.symbol);
-      const bThreshold = getAlertThreshold(b.symbol);
-      const aAlerting = isMonitored(a.symbol) && a.realSpread >= aThreshold;
-      const bAlerting = isMonitored(b.symbol) && b.realSpread >= bThreshold;
-      if (aAlerting && !bAlerting) return -1;
-      if (!aAlerting && bAlerting) return 1;
-      return (b.realSpread || -999) - (a.realSpread || -999);
+      const marginA = pairMargins[a.symbol] || 1000;
+      const marginB = pairMargins[b.symbol] || 1000;
+
+      const levA = PAIR_LEVERAGE[a.symbol] || 10;
+      const levB = PAIR_LEVERAGE[b.symbol] || 10;
+
+      const profitA = (marginA * levA) * ((a.realSpread || 0) / 100);
+      const profitB = (marginB * levB) * ((b.realSpread || 0) / 100);
+
+      return profitB - profitA; // Descending Profit
     });
-  }, [dynamicPairs, isMonitored, getAlertThreshold]);
+  }, [dynamicPairs, pairMargins]);
 
   // --- Actions ---
   const addPosition = (pos) => setPositions(prev => [...prev, pos]);
@@ -92,6 +103,10 @@ function App() {
       return next;
     });
     setSettingsOpenFor(null);
+  };
+
+  const updateMargin = (symbol, val) => {
+    setPairMargins(prev => ({ ...prev, [symbol]: parseFloat(val) || 0 }));
   };
 
   const toggleDisabledAlarm = (symbol) => {
@@ -138,6 +153,8 @@ function App() {
                   hasCustomThreshold={pairThresholds.hasOwnProperty(row.symbol)}
                   updateThreshold={updateThreshold}
                   minSpread={minSpread}
+                  margin={pairMargins[row.symbol] || 1000}
+                  onUpdateMargin={updateMargin}
                 />
               ))}
             </AnimatePresence>
