@@ -54,6 +54,26 @@ class ParadexService extends BaseExchangeService {
             return [];
         }
     }
+
+    async start(): Promise<void> {
+        logger.info(TAG, 'Starting Paradex polling...');
+        this.poll();
+        setInterval(() => this.poll(), 2000);
+    }
+
+    private async poll() {
+        const markets = await this.fetchMarkets();
+        const now = Date.now();
+        markets.forEach(m => {
+            this.emit('update', {
+                symbol: m.symbol,
+                bid: m.bid,
+                ask: m.ask,
+                timestamp: now,
+                source: 'rest'
+            });
+        });
+    }
 }
 
 // Export singleton instance

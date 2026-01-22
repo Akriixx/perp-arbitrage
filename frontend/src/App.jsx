@@ -31,6 +31,9 @@ function App() {
   const [positions, setPositions] = useLocalStorage('active_positions', []);
 
   // --- Hooks and Data ---
+  const [marginPerSide, setMarginPerSide] = useLocalStorage('calc_margin_per_side', 1000);
+
+  // --- Hooks and Data ---
   const { pairs, isLoading, error, refresh, refreshInterval, setRefreshInterval } = useMarketData();
   const { minSpread, soundEnabled } = useAlerts();
 
@@ -119,6 +122,28 @@ function App() {
     if (activeTab === 'scanner') {
       return (
         <>
+          {/* MARGIN SELECTION BAR */}
+          <div className="flex items-center justify-center gap-4 mb-8">
+            <span className="text-gray-400 text-xs font-bold tracking-widest uppercase">Margin Per Side</span>
+            <div className="bg-[#1a1a1a] p-1 rounded-xl flex gap-1 border border-[#2a2a2a]">
+              {[500, 1000, 2500, 5000].map(val => (
+                <button
+                  key={val}
+                  onClick={() => setMarginPerSide(val)}
+                  className={`
+                    px-4 py-1.5 rounded-lg text-sm font-bold transition-all duration-200
+                    ${marginPerSide === val
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                      : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'
+                    }
+                  `}
+                >
+                  ${val}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {!isLoading && sortedData.length === 0 && !error && (
             <div className="text-center py-32 opacity-50">
               <p className="text-2xl font-light">No opportunities found.</p>
@@ -132,6 +157,7 @@ function App() {
                   key={row.symbol || i}
                   row={row}
                   index={i}
+                  margin={marginPerSide}
                   onSelect={setSelectedPair}
                   settingsOpenFor={settingsOpenFor}
                   setSettingsOpenFor={setSettingsOpenFor}

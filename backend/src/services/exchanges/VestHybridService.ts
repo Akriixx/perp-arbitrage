@@ -79,7 +79,7 @@ class VestHybridService extends EventEmitter {
                 this.emit('update', price);
             });
 
-            logger.debug(TAG, `REST update: ${markets.length} prices`);
+            // logger.debug(TAG, `REST update: ${markets.length} prices`);
         } catch (error: any) {
             logger.error(TAG, `REST fetch failed: ${error.message}`);
         }

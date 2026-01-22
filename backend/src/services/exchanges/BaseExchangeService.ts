@@ -35,17 +35,20 @@ export interface IExchangeService {
     fetchMarkets(): Promise<MarketData[]>;
 }
 
+import { EventEmitter } from 'events';
+
 /**
  * Abstract base class for exchange services
  * Provides common functionality and enforces interface
  */
-export abstract class BaseExchangeService implements IExchangeService {
+export abstract class BaseExchangeService extends EventEmitter implements IExchangeService {
     abstract readonly name: string;
 
     protected readonly requestTimeout: number;
     protected readonly apiEndpoint: string;
 
     constructor(config: ExchangeConfig) {
+        super();
         this.apiEndpoint = config.apiEndpoint;
         this.requestTimeout = config.requestTimeout ?? 10000;
     }

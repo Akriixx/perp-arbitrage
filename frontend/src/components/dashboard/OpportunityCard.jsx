@@ -12,7 +12,8 @@ export default function OpportunityCard({
     getAlertThreshold,
     hasCustomThreshold,
     updateThreshold,
-    minSpread
+    minSpread,
+    margin
 }) {
     const spread = row.realSpread || 0;
     const buyEx = row.bestAskEx || 'Unknown';
@@ -21,9 +22,6 @@ export default function OpportunityCard({
     const threshold = getAlertThreshold(row.symbol);
     const isAlerting = hasCustomThreshold && spread >= threshold;
     const isSettingsOpen = settingsOpenFor === row.symbol;
-
-    // Estimated Profit Logic (Static Global Margin)
-    const margin = parseFloat(localStorage.getItem('calc_margin_per_side')) || 1000;
 
     // Leverage Config (duplicated for display)
     const PAIR_LEVERAGE = {
