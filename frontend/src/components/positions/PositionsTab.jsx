@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingDown, Trash2, Clock, ArrowRight, Bell, Edit2, Check, X } from 'lucide-react';
+import { TrendingDown, Trash2, Clock, ArrowRight, Bell, Edit2, Check, X, Coins, TrendingUp } from 'lucide-react';
 import CryptoIcon from '../dashboard/CryptoIcon';
 import ExchangeIcon from '../dashboard/ExchangeIcon';
 
@@ -10,6 +10,27 @@ export default function PositionsTab({ positions, pairs, onRemove, onUpdate }) {
     const getLiveSpread = (symbol) => {
         const pair = pairs.find(p => p.symbol === symbol);
         return pair ? pair.realSpread : null;
+    };
+
+    const calculatePnL = (pos) => {
+        if (!pos.size || !pos.entryBuyPrice || !pos.entrySellPrice) return null;
+
+        const pair = pairs.find(p => p.symbol === pos.symbol);
+        if (!pair) return null;
+
+        const buyExKey = pos.buyEx.toLowerCase();
+        const sellExKey = pos.sellEx.toLowerCase();
+
+        // We entered Long on buyEx -> We sell (Bid) to close
+        const currentBid = pair[buyExKey]?.bid;
+
+        // We entered Short on sellEx -> We buy (Ask) to close
+        const currentAsk = pair[sellExKey]?.ask;
+
+        if (!currentBid || !currentAsk) return null;
+
+        const pnl = (currentBid - pos.entryBuyPrice + pos.entrySellPrice - currentAsk) * pos.size;
+        return pnl;
     };
 
     const handleStartEdit = (pos) => {
@@ -47,6 +68,7 @@ export default function PositionsTab({ positions, pairs, onRemove, onUpdate }) {
                         const liveSpread = getLiveSpread(pos.symbol);
                         const isTargetReached = liveSpread !== null && liveSpread <= pos.exitTargetSpread;
                         const isEditing = editingId === pos.id;
+                        const pnl = calculatePnL(pos);
 
                         return (
                             <div
@@ -76,9 +98,17 @@ export default function PositionsTab({ positions, pairs, onRemove, onUpdate }) {
                                         </div>
                                         <div>
                                             <h3 className="text-2xl font-bold text-white leading-none mb-2">{pos.symbol}</h3>
-                                            <div className="flex items-center gap-2 text-gray-500 text-xs font-medium">
-                                                <Clock className="w-3.5 h-3.5" />
-                                                Opened {new Date(pos.timestamp).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                            <div className="flex flex-col gap-1">
+                                                <div className="flex items-center gap-2 text-gray-500 text-xs font-medium">
+                                                    <Clock className="w-3.5 h-3.5" />
+                                                    Opened {new Date(pos.timestamp).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                </div>
+                                                {pos.size > 0 && (
+                                                    <div className="flex items-center gap-1.5 text-blue-400 text-xs font-bold bg-blue-500/10 px-2 py-0.5 rounded-md w-fit">
+                                                        <Coins className="w-3 h-3" />
+                                                        Size: {pos.size}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -103,6 +133,29 @@ export default function PositionsTab({ positions, pairs, onRemove, onUpdate }) {
                                         </span>
                                     </div>
                                 </div>
+
+                                {/* NEW: uPNL Section */}
+                                {pnl !== null && (
+                                    <div className="mb-6 bg-[#0f1117]/80 rounded-2xl p-4 border border-gray-800/50 flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <div className={`p-2 rounded-lg ${pnl >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+                                                {pnl >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                                            </div>
+                                            <div>
+                                                <span className="text-[10px] text-gray-500 uppercase tracking-widest font-bold block">Est. Profit</span>
+                                                <span className={`text-base font-black ${pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                    {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)} USDT
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className="text-[10px] text-gray-500 uppercase tracking-widest font-bold block">Current Value</span>
+                                            <span className="text-xs font-mono text-gray-400">
+                                                Based on live bid/ask
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div className="space-y-3">
                                     <div className="flex items-center justify-between text-xs px-1">
