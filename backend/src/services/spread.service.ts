@@ -4,7 +4,9 @@
  * V2: Supports stale data filtering via validator function
  */
 
-const EXCHANGES = ['vest', 'lighter', 'paradex', 'extended'];
+import { ACTIVE_EXCHANGES } from '../config';
+
+const EXCHANGES = ACTIVE_EXCHANGES;
 
 // Default: 30 seconds staleness threshold
 const STALE_THRESHOLD = 30000;

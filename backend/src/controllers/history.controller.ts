@@ -60,7 +60,7 @@ export async function getSpreadHistoryController(req: Request, res: Response) {
 
                     return {
                         timestamp: new Date(bucket.timestamp).toISOString(),
-                        spread: parseFloat(max(bucket.spreads).toFixed(2)), // MAX Spread rule
+                        spread: parseFloat(avg(bucket.spreads).toFixed(2)), // AVERAGE Spread rule (Smoother)
                         lighter_price: parseFloat(avg(bucket.best_asks).toFixed(2)),
                         vest_price: parseFloat(avg(bucket.best_bids).toFixed(2))
                     };

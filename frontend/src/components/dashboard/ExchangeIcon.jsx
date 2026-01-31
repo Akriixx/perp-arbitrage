@@ -4,7 +4,8 @@ import extendedIcon from '../../assets/extended.png';
 const EXCHANGE_DOMAINS = {
     vest: 'vestmarkets.com',
     paradex: 'paradex.trade',
-    lighter: 'lighter.xyz'
+    lighter: 'lighter.xyz',
+    nado: 'nado.xyz'
 };
 
 export default function ExchangeIcon({ exchange, className = "w-5 h-5" }) {

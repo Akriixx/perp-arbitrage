@@ -4,10 +4,7 @@
  * Refactored to TypeScript
  */
 
-import { paradexService } from './exchanges/ParadexService';
-import { vestService } from './exchanges/VestService';
-import { lighterService } from './exchanges/LighterService';
-import { extendedService } from './exchanges/ExtendedService';
+import { getAllExchanges, nadoService, vestService, lighterService, paradexService, extendedService } from './exchanges';
 import { TimestampedPrice } from './exchanges/HybridExchangeService';
 import { ALLOWED_SYMBOLS } from '../config';
 import { logger } from '../utils/app-logger';
@@ -36,6 +33,7 @@ export interface AggregatedPair {
     lighter: ExchangePrice;
     paradex: ExchangePrice;
     extended: ExchangePrice;
+    nado: ExchangePrice;
 
     // Calculated fields
     bestBid: number;
@@ -66,16 +64,19 @@ let broadcastPending = false;
  * Create empty pair structure
  */
 function createPair(symbol: string): AggregatedPair {
-    return {
+    const pair: any = {
         symbol,
-        vest: { bid: 0, ask: 0, timestamp: 0, source: 'none' },
-        lighter: { bid: 0, ask: 0, timestamp: 0, source: 'none' },
-        paradex: { bid: 0, ask: 0, timestamp: 0, source: 'none' },
-        extended: { bid: 0, ask: 0, timestamp: 0, source: 'none' },
         bestBid: 0,
         bestAsk: 0,
         realSpread: 0
     };
+
+    // Initialize all registered exchanges
+    getAllExchanges().forEach(ex => {
+        pair[ex.name.toLowerCase()] = { bid: 0, ask: 0, timestamp: 0, source: 'none' };
+    });
+
+    return pair as AggregatedPair;
 }
 
 /**
@@ -202,12 +203,11 @@ export function getPriceCache() {
  * Get service stats
  */
 export function getStats() {
-    return {
-        vest: vestService.getStats(),
-        lighter: lighterService.getStats(),
-        paradex: paradexService.getStats(),
-        extended: extendedService.getStats()
-    };
+    const stats: Record<string, any> = {};
+    getAllExchanges().forEach(ex => {
+        stats[ex.name.toLowerCase()] = ex.getStats();
+    });
+    return stats;
 }
 
 /**
@@ -223,24 +223,16 @@ export async function startScheduler() {
     });
     logger.info(TAG, `Initialized cache with ${Object.keys(PRICE_CACHE).length} symbols`);
 
-    // Start Paradex
-    paradexService.on('update', (data) => handleUpdate('paradex', data));
-    await paradexService.start();
-
-    // Start Vest
-    vestService.on('update', (data) => handleUpdate('vest', data));
-    await vestService.start();
-
-    // Start Lighter
-    lighterService.on('update', (data) => handleUpdate('lighter', data));
-    await lighterService.start();
-
-    // Start Extended
-    extendedService.on('update', (data) => handleUpdate('extended', data));
-    await extendedService.start();
+    // Dynamic Start
+    const exchanges = getAllExchanges();
+    for (const service of exchanges) {
+        const key = service.name.toLowerCase() as keyof AggregatedPair; // e.g. 'vest'
+        service.on('update', (data) => handleUpdate(key, data));
+        await service.start();
+    }
 
     logger.info(TAG, '════════════════════════════════════════════════');
-    logger.info(TAG, '✓ All services started');
+    logger.info(TAG, `✓ All ${exchanges.length} services started`);
     logger.info(TAG, '════════════════════════════════════════════════');
 }
 
@@ -249,10 +241,7 @@ export async function startScheduler() {
  */
 export function stopScheduler() {
     logger.info(TAG, 'Stopping all services...');
-    paradexService.stop();
-    vestService.stop();
-    lighterService.stop();
-    extendedService.stop();
+    getAllExchanges().forEach(service => service.stop());
     logger.info(TAG, 'All services stopped');
 }
 
@@ -266,3 +255,29 @@ export function setWebSocketBroadcaster(broadcaster: Broadcaster) {
 
 // Alias for getPriceCache to match API expectation
 export const getScans = getPriceCache;
+
+/**
+ * Force update from all exchanges (Manual Refresh)
+ */
+export async function updateMarketData() {
+    const services = getAllExchanges();
+
+    await Promise.all(services.map(async (service) => {
+        try {
+            const markets = await service.fetchMarkets();
+            markets.forEach((m: any) => {
+                handleUpdate(service.name.toLowerCase() as keyof AggregatedPair, {
+                    symbol: m.symbol,
+                    bid: m.bid,
+                    ask: m.ask,
+                    timestamp: Date.now(),
+                    source: 'manual'
+                });
+            });
+        } catch (e) {
+            logger.error(TAG, `Manual refresh failed for ${service.name}`, e);
+        }
+    }));
+
+    return getPriceCache();
+}

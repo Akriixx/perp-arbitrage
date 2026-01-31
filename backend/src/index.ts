@@ -53,7 +53,8 @@ function broadcastPriceUpdate(priceCache: any) {
         paradex: pair.paradex,
         lighter: pair.lighter,
         vest: pair.vest,
-        extended: pair.extended
+        extended: pair.extended,
+        nado: pair.nado
     }));
 
     const message = JSON.stringify({ type: 'update', pairs });

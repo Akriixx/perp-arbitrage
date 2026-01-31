@@ -38,3 +38,5 @@ export const ALLOWED_SYMBOLS = [
     'BTC', 'ETH', 'SOL', 'PAXG', 'RESOLV', 'BERA', 'KAITO',
     'AAVE', 'SUI', 'XRP', 'GRASS'
 ];
+
+export const ACTIVE_EXCHANGES = ['vest', 'lighter', 'paradex', 'extended', 'nado'];

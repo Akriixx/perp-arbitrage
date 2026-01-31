@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import DetailView from './components/dashboard/DetailView';
 import DashboardHeader from './components/dashboard/DashboardHeader';
+import Sidebar from './components/layout/Sidebar';
 import OpportunityCard from './components/dashboard/OpportunityCard';
 import PositionsTab from './components/positions/PositionsTab';
 import AddPositionModal from './components/positions/AddPositionModal';
@@ -15,6 +16,9 @@ import { useLocalStorage } from './hooks/useLocalStorage';
 import { useAppAlarms } from './hooks/useAppAlarms';
 
 
+import { ACTIVE_EXCHANGES_LIST } from './utils/constants';
+
+
 function App() {
   const [activeTab, setActiveTab] = useState('scanner');
   const [selectedPair, setSelectedPair] = useState(null);
@@ -23,7 +27,9 @@ function App() {
   const [isActiveAlarmsModalOpen, setIsActiveAlarmsModalOpen] = useState(false);
 
   // --- State with Persistence ---
-  const [enabledExchanges, setEnabledExchanges] = useLocalStorage('enabled_exchanges', { vest: true, lighter: true, paradex: true, extended: true });
+  // Initialize from constant list to ensure all are enabled by default
+  const defaultExchanges = ACTIVE_EXCHANGES_LIST.reduce((acc, ex) => ({ ...acc, [ex]: true }), {});
+  const [enabledExchanges, setEnabledExchanges] = useLocalStorage('enabled_exchanges', defaultExchanges);
   const [pairThresholds, setPairThresholds] = useLocalStorage('pair_thresholds', {});
   const [disabledAlarms, setDisabledAlarms] = useLocalStorage('disabled_alarms', []);
   const [trades, setTrades] = useLocalStorage('track_trades', []);
@@ -46,7 +52,7 @@ function App() {
     let maxBid = 0, maxBidEx = null;
     let minAsk = Infinity, minAskEx = null;
 
-    ['vest', 'lighter', 'paradex', 'extended'].forEach(ex => {
+    ACTIVE_EXCHANGES_LIST.forEach(ex => {
       if (!enabledExchanges[ex]) return;
       const bid = pair[ex]?.bid || 0;
       const ask = pair[ex]?.ask || 0;
@@ -123,7 +129,7 @@ function App() {
       return (
         <>
           {/* MARGIN SELECTION BAR */}
-          <div className="flex items-center justify-center gap-4 mb-8">
+          <div className="flex items-center justify-start gap-4 mb-10 pl-2">
             <span className="text-gray-400 text-xs font-bold tracking-widest uppercase">Margin Per Side</span>
             <div className="bg-[#1a1a1a] p-1 rounded-xl flex gap-1 border border-[#2a2a2a]">
               {[500, 1000, 2500, 5000].map(val => (
@@ -194,31 +200,41 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f1117] text-white font-sans selection:bg-blue-500/30">
-      <DashboardHeader
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
+    <div className="flex h-screen bg-[#0f1117] text-white font-sans selection:bg-blue-500/30 overflow-hidden">
+      {/* Sidebar - Fixed Left */}
+      <Sidebar
         enabledExchanges={enabledExchanges}
         setEnabledExchanges={setEnabledExchanges}
-        refreshInterval={refreshInterval}
-        setRefreshInterval={setRefreshInterval}
-        refresh={refresh}
         isLoading={isLoading}
-        onAddPosition={() => setIsAddModalOpen(true)}
-        monitoredCount={monitoredCount}
-        onOpenAlarms={() => setIsActiveAlarmsModalOpen(true)}
       />
 
-      <div className="max-w-[1400px] mx-auto px-6 pb-20">
-        {error && (
-          <div className="bg-red-500/10 border border-red-500/20 text-red-200 p-6 rounded-2xl mb-8 text-center backdrop-blur-sm">
-            <p className="font-bold text-lg mb-2">Connection Error</p>
-            <p className="opacity-80">{error}</p>
+      {/* Main Content - Scrollable Right */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <div className="overflow-y-auto custom-scrollbar flex-1 h-full">
+          <DashboardHeader
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            refreshInterval={refreshInterval}
+            setRefreshInterval={setRefreshInterval}
+            refresh={refresh}
+            isLoading={isLoading}
+            onAddPosition={() => setIsAddModalOpen(true)}
+            monitoredCount={monitoredCount}
+            onOpenAlarms={() => setIsActiveAlarmsModalOpen(true)}
+          />
+
+          <div className="max-w-[1600px] mx-auto px-6 pb-20">
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/20 text-red-200 p-6 rounded-2xl mb-8 text-center backdrop-blur-sm">
+                <p className="font-bold text-lg mb-2">Connection Error</p>
+                <p className="opacity-80">{error}</p>
+              </div>
+            )}
+
+            {renderContent()}
+
           </div>
-        )}
-
-        {renderContent()}
-
+        </div>
       </div>
 
       <AddPositionModal
@@ -230,7 +246,11 @@ function App() {
 
       <AnimatePresence>
         {selectedPair && (
-          <DetailView pair={selectedPair.symbol} data={selectedPair} onClose={() => setSelectedPair(null)} />
+          <DetailView
+            pair={selectedPair.symbol}
+            data={dynamicPairs.find(p => p.symbol === selectedPair.symbol) || selectedPair}
+            onClose={() => setSelectedPair(null)}
+          />
         )}
       </AnimatePresence>
 
@@ -238,6 +258,11 @@ function App() {
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .animate-pulse-slow { animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
         @keyframes pulse-slow { 0%, 100% { opacity: 1; } 50% { opacity: .75; } }
+        /* Custom Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #444; }
       `}</style>
       <ExitAlarmModal
         position={activeAlarm}

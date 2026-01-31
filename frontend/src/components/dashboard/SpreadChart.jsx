@@ -4,10 +4,14 @@ import {
 } from 'recharts';
 import { Loader2 } from 'lucide-react';
 
-export default function SpreadChart({ pair }) {
+export default function SpreadChart({ pair, liveData }) {
     const [period, setPeriod] = useState('24h');
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
+
+    // Use live value if available, otherwise historical or 0
+    // liveData comes from App -> DetailView -> here (Updates based on dashboard refresh interval)
+    const currentSpread = liveData?.realSpread ?? data?.stats?.current;
 
     const fetchHistory = async () => {
         setLoading(true);
@@ -111,7 +115,7 @@ export default function SpreadChart({ pair }) {
                 <div className="flex gap-12 mb-6 border-b border-white/5 pb-4 px-1">
                     <StatItem
                         label="Current Spread"
-                        value={data.stats.current}
+                        value={currentSpread !== undefined && currentSpread !== null ? Number(currentSpread).toFixed(2) : '-'}
                         suffix="%"
                         colorClass="text-emerald-400"
                     />
@@ -152,7 +156,21 @@ export default function SpreadChart({ pair }) {
 
                 {data?.data && (
                     <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={data.data}>
+                        <AreaChart data={(() => {
+                            if (!data.data || data.data.length === 0 || !liveData) return data.data;
+                            // Create a shallow copy of the array to avoid mutating state
+                            const newData = [...data.data];
+                            // Update the last point with real-time data
+                            const lastIndex = newData.length - 1;
+                            newData[lastIndex] = {
+                                ...newData[lastIndex],
+                                spread: liveData.realSpread,
+                                // Update individual prices if available in liveData
+                                lighter_price: liveData.bestAsk || newData[lastIndex].lighter_price,
+                                vest_price: liveData.bestBid || newData[lastIndex].vest_price
+                            };
+                            return newData;
+                        })()}>
                             <defs>
                                 <linearGradient id="colorSpread" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />

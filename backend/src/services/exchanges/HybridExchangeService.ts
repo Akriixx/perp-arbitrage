@@ -21,7 +21,7 @@ export interface TimestampedPrice {
     bid: number;
     ask: number;
     timestamp: number;
-    source: 'ws' | 'rest';
+    source: 'ws' | 'rest' | 'manual';
 }
 
 /**

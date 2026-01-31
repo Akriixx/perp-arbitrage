@@ -7,7 +7,12 @@ export const EXCHANGES = [
     { id: 'paradex', name: 'Paradex', icon: 'BarChart2' },
     { id: 'vest', name: 'Vest', icon: 'Activity' },
     { id: 'lighter', name: 'Lighter', icon: 'Zap' },
+    { id: 'extended', name: 'Extended', icon: 'Box' },
+    { id: 'nado', name: 'Nado', icon: 'Circle' }
 ];
+
+// Simple list of exchange IDs for iteration
+export const ACTIVE_EXCHANGES_LIST = ['vest', 'lighter', 'paradex', 'extended', 'nado'];
 
 export const REFRESH_INTERVALS = [
     { value: 10000, label: '10s' },

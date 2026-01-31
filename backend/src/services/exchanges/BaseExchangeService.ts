@@ -33,6 +33,18 @@ export interface IExchangeService {
      * @returns Array of market data with symbol, bid, and ask prices
      */
     fetchMarkets(): Promise<MarketData[]>;
+
+    /** Start the service (e.g. WebSocket connection) */
+    start(): Promise<void>;
+
+    /** Stop the service */
+    stop(): void;
+
+    /** Get service statistics */
+    getStats(): any;
+
+    /** Subscribe to events */
+    on(event: string, listener: (...args: any[]) => void): this;
 }
 
 import { EventEmitter } from 'events';
@@ -55,6 +67,11 @@ export abstract class BaseExchangeService extends EventEmitter implements IExcha
     }
 
     abstract fetchMarkets(): Promise<MarketData[]>;
+
+    // Default lifecycle methods (can be overridden)
+    async start(): Promise<void> { }
+    stop(): void { }
+    getStats(): any { return {}; }
 
     /**
      * Validate and filter crypto symbols
