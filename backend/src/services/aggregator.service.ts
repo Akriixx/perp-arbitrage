@@ -34,6 +34,7 @@ export interface AggregatedPair {
     paradex: ExchangePrice;
     extended: ExchangePrice;
     nado: ExchangePrice;
+    zeroone: ExchangePrice;
 
     // Calculated fields
     bestBid: number;

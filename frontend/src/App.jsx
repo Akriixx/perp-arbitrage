@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import DetailView from './components/dashboard/DetailView';
 import DashboardHeader from './components/dashboard/DashboardHeader';
@@ -14,10 +14,7 @@ import useMarketData from './hooks/useMarketData';
 import { useAlerts } from './hooks/useAlerts';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { useAppAlarms } from './hooks/useAppAlarms';
-
-
-import { ACTIVE_EXCHANGES_LIST } from './utils/constants';
-
+import { ACTIVE_EXCHANGES_LIST, EXCHANGES, AVAILABLE_SYMBOLS } from './utils/constants';
 
 function App() {
   const [activeTab, setActiveTab] = useState('scanner');
@@ -29,17 +26,19 @@ function App() {
   // --- State with Persistence ---
   // Initialize from constant list to ensure all are enabled by default
   const defaultExchanges = ACTIVE_EXCHANGES_LIST.reduce((acc, ex) => ({ ...acc, [ex]: true }), {});
-  const [enabledExchanges, setEnabledExchanges] = useLocalStorage('enabled_exchanges', defaultExchanges);
+  const [storedExchanges, setStoredExchanges] = useLocalStorage('enabled_exchanges', defaultExchanges);
+
+  // Merge stored with default to ensure new keys appear
+  const enabledExchanges = { ...defaultExchanges, ...storedExchanges };
+  const setEnabledExchanges = setStoredExchanges;
   const [pairThresholds, setPairThresholds] = useLocalStorage('pair_thresholds', {});
   const [disabledAlarms, setDisabledAlarms] = useLocalStorage('disabled_alarms', []);
   const [trades, setTrades] = useLocalStorage('track_trades', []);
   const [initialInvestment, setInitialInvestment] = useLocalStorage('initial_investment', 1000);
   const [positions, setPositions] = useLocalStorage('active_positions', []);
 
-  // --- Hooks and Data ---
   const [marginPerSide, setMarginPerSide] = useLocalStorage('calc_margin_per_side', 1000);
 
-  // --- Hooks and Data ---
   const { pairs, isLoading, error, refresh, refreshInterval, setRefreshInterval } = useMarketData();
   const { minSpread, soundEnabled } = useAlerts();
 
@@ -48,6 +47,10 @@ function App() {
   const getAlertThreshold = useCallback((symbol) => pairThresholds[symbol] !== undefined ? pairThresholds[symbol] : minSpread, [pairThresholds, minSpread]);
 
   // Derived Data: Dynamic Spreads
+  const exchangesMap = useMemo(() => {
+    return EXCHANGES.reduce((acc, ex) => ({ ...acc, [ex.id]: ex.name.toUpperCase() }), {});
+  }, []);
+
   const getDynamicSpread = useCallback((pair) => {
     let maxBid = 0, maxBidEx = null;
     let minAsk = Infinity, minAskEx = null;
@@ -56,8 +59,14 @@ function App() {
       if (!enabledExchanges[ex]) return;
       const bid = pair[ex]?.bid || 0;
       const ask = pair[ex]?.ask || 0;
-      if (bid > maxBid) { maxBid = bid; maxBidEx = ex.toUpperCase(); }
-      if (ask > 0 && ask < minAsk) { minAsk = ask; minAskEx = ex.toUpperCase(); }
+      if (bid > maxBid) {
+        maxBid = bid;
+        maxBidEx = exchangesMap[ex] || ex.toUpperCase();
+      }
+      if (ask > 0 && ask < minAsk) {
+        minAsk = ask;
+        minAskEx = exchangesMap[ex] || ex.toUpperCase();
+      }
     });
 
     if (maxBid > 0 && minAsk !== Infinity) {
@@ -84,11 +93,14 @@ function App() {
   }, [dynamicPairs, isMonitored, getAlertThreshold]);
 
   // --- Actions ---
-  const addPosition = (pos) => setPositions(prev => [...prev, pos]);
-  const removePosition = (id) => setPositions(prev => prev.filter(p => p.id !== id));
-  const updatePosition = (id, updates) => {
+  const addPosition = useCallback((pos) => setPositions(prev => [...prev, pos]), [setPositions]);
+  const removePosition = useCallback((id) => setPositions(prev => prev.filter(p => p.id !== id)), [setPositions]);
+  const updatePosition = useCallback((id, updates) => {
     setPositions(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
-  };
+  }, [setPositions]);
+
+  const handleOpenAddModal = useCallback(() => setIsAddModalOpen(true), []);
+  const handleCloseAddModal = useCallback(() => setIsAddModalOpen(false), []);
 
   const addTrade = (trade) => setTrades(prev => [trade, ...prev]);
   const removeTrade = (id) => setTrades(prev => prev.filter(t => t.id !== id));
@@ -218,7 +230,7 @@ function App() {
             setRefreshInterval={setRefreshInterval}
             refresh={refresh}
             isLoading={isLoading}
-            onAddPosition={() => setIsAddModalOpen(true)}
+            onAddPosition={handleOpenAddModal}
             monitoredCount={monitoredCount}
             onOpenAlarms={() => setIsActiveAlarmsModalOpen(true)}
           />
@@ -239,9 +251,9 @@ function App() {
 
       <AddPositionModal
         isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
+        onClose={handleCloseAddModal}
         onAdd={addPosition}
-        symbols={['BTC', 'ETH', 'SOL', 'PAXG', 'RESOLV', 'BERA', 'KAITO', 'AAVE', 'SUI', 'XRP', 'GRASS']}
+        symbols={AVAILABLE_SYMBOLS}
       />
 
       <AnimatePresence>

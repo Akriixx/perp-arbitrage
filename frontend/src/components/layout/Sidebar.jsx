@@ -1,10 +1,17 @@
+import React from 'react';
+import { ACTIVE_EXCHANGES_LIST, EXCHANGES } from '../../utils/constants';
 import { Layers, RefreshCw } from 'lucide-react';
 
-export default function Sidebar({ enabledExchanges, setEnabledExchanges, isLoading }) {
-    const exchanges = ['vest', 'lighter', 'paradex', 'extended', 'nado'];
+const Sidebar = React.memo(({ enabledExchanges, setEnabledExchanges, isLoading }) => {
+    const exchanges = ACTIVE_EXCHANGES_LIST;
 
     const toggleExchange = (ex) => {
         setEnabledExchanges(prev => ({ ...prev, [ex]: !prev[ex] }));
+    };
+
+    const getDisplayName = (id) => {
+        const found = EXCHANGES.find(e => e.id === id);
+        return found ? found.name : id;
     };
 
     return (
@@ -48,7 +55,7 @@ export default function Sidebar({ enabledExchanges, setEnabledExchanges, isLoadi
                                 text-sm font-bold uppercase tracking-wide transition-colors
                                 ${isActive ? 'text-blue-100' : 'text-gray-500 group-hover:text-gray-300'}
                             `}>
-                                {ex}
+                                {getDisplayName(ex)}
                             </span>
 
                             <div className={`
@@ -67,4 +74,6 @@ export default function Sidebar({ enabledExchanges, setEnabledExchanges, isLoadi
             </div>
         </aside>
     );
-}
+});
+
+export default Sidebar;

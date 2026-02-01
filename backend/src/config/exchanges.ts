@@ -13,7 +13,10 @@ export const API_ENDPOINTS = {
     EXTENDED_MARKETS: process.env.API_EXTENDED_MARKETS || 'https://api.starknet.extended.exchange/api/v1/info/markets',
     // NADO Exchange
     NADO_REST: process.env.API_NADO || 'https://gateway.prod.nado.xyz/v1',
-    NADO_WS: process.env.WS_NADO || 'wss://gateway.prod.nado.xyz/v1/subscribe'
+    NADO_WS: process.env.WS_NADO || 'wss://gateway.prod.nado.xyz/v1/subscribe',
+    // 01.XYZ Exchange
+    ZEROONE_REST: process.env.API_ZEROONE || 'https://zo-mainnet.n1.xyz',
+    ZEROONE_WS: process.env.WS_ZEROONE || 'wss://zo-mainnet.n1.xyz'
 };
 
 // Blacklist: Stock tickers, FX pairs, indices (not crypto)

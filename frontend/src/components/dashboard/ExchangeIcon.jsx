@@ -5,7 +5,8 @@ const EXCHANGE_DOMAINS = {
     vest: 'vestmarkets.com',
     paradex: 'paradex.trade',
     lighter: 'lighter.xyz',
-    nado: 'nado.xyz'
+    nado: 'nado.xyz',
+    zeroone: '01.xyz'
 };
 
 export default function ExchangeIcon({ exchange, className = "w-5 h-5" }) {

@@ -39,4 +39,4 @@ export const ALLOWED_SYMBOLS = [
     'AAVE', 'SUI', 'XRP', 'GRASS'
 ];
 
-export const ACTIVE_EXCHANGES = ['vest', 'lighter', 'paradex', 'extended', 'nado'];
+export const ACTIVE_EXCHANGES = ['vest', 'lighter', 'paradex', 'extended', 'nado', 'zeroone'];

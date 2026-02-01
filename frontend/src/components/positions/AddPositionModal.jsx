@@ -1,11 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { X, Plus, AlertCircle } from 'lucide-react';
+import { EXCHANGES } from '../../utils/constants';
 
-export default function AddPositionModal({ isOpen, onClose, onAdd, symbols }) {
+export default React.memo(function AddPositionModal({ isOpen, onClose, onAdd, symbols }) {
+    const exchangeOptions = useMemo(() => EXCHANGES.filter(ex => ex.id !== 'all'), []);
+
     const [formData, setFormData] = useState({
         symbol: symbols[0] || 'BTC',
-        buyEx: 'VEST',
-        sellEx: 'PARADEX',
+        buyEx: 'vest',
+        sellEx: 'paradex',
         entryBuyPrice: '',
         entrySellPrice: '',
         size: '',
@@ -30,8 +33,8 @@ export default function AddPositionModal({ isOpen, onClose, onAdd, symbols }) {
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-[#1a1d24] border border-gray-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 animate-in fade-in duration-100">
+            <div className="bg-[#1a1d24] border border-gray-800 w-full max-w-md rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden">
                 <div className="flex justify-between items-center p-6 border-b border-gray-800">
                     <h2 className="text-xl font-bold flex items-center gap-2">
                         <Plus className="w-5 h-5 text-blue-400" />
@@ -75,10 +78,9 @@ export default function AddPositionModal({ isOpen, onClose, onAdd, symbols }) {
                                 onChange={(e) => setFormData({ ...formData, buyEx: e.target.value })}
                                 className="w-full bg-[#0f1117] border border-gray-700 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-blue-500 transition-colors"
                             >
-                                <option value="VEST">VEST</option>
-                                <option value="LIGHTER">LIGHTER</option>
-                                <option value="PARADEX">PARADEX</option>
-                                <option value="EXTENDED">EXTENDED</option>
+                                {exchangeOptions.map(ex => (
+                                    <option key={ex.id} value={ex.id}>{ex.name.toUpperCase()}</option>
+                                ))}
                             </select>
                         </div>
                         <div>
@@ -88,10 +90,9 @@ export default function AddPositionModal({ isOpen, onClose, onAdd, symbols }) {
                                 onChange={(e) => setFormData({ ...formData, sellEx: e.target.value })}
                                 className="w-full bg-[#0f1117] border border-gray-700 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-blue-500 transition-colors"
                             >
-                                <option value="PARADEX">PARADEX</option>
-                                <option value="VEST">VEST</option>
-                                <option value="LIGHTER">LIGHTER</option>
-                                <option value="EXTENDED">EXTENDED</option>
+                                {exchangeOptions.map(ex => (
+                                    <option key={ex.id} value={ex.id}>{ex.name.toUpperCase()}</option>
+                                ))}
                             </select>
                         </div>
                     </div>
@@ -151,4 +152,4 @@ export default function AddPositionModal({ isOpen, onClose, onAdd, symbols }) {
             </div>
         </div>
     );
-}
+});

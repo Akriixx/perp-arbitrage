@@ -1,6 +1,7 @@
+import React from 'react';
 import { RefreshCw, PlusCircle, LayoutDashboard, Briefcase, Bell, BarChart3 } from 'lucide-react';
 
-export default function DashboardHeader({
+const DashboardHeader = React.memo(({
     activeTab,
     setActiveTab,
     refreshInterval,
@@ -10,9 +11,9 @@ export default function DashboardHeader({
     onAddPosition,
     monitoredCount,
     onOpenAlarms
-}) {
+}) => {
     return (
-        <header className="pt-8 pb-6 px-6 mb-4 backdrop-blur-md sticky top-0 z-30 bg-[#0f1117]/80 flex justify-start">
+        <header className="pt-8 pb-6 px-6 mb-4 sticky top-0 z-30 bg-[#0f1117]/80 flex justify-start border-b border-gray-800/10">
             {/* Tabs Navigation Centered */}
             <div className="flex items-center bg-[#1a1d24] p-1.5 rounded-2xl border border-gray-800 shadow-2xl shadow-black/50">
                 <div className="flex items-center gap-1.5 px-3 border-r border-gray-800/50 mr-1">
@@ -91,4 +92,6 @@ export default function DashboardHeader({
             </div>
         </header>
     );
-}
+});
+
+export default DashboardHeader;

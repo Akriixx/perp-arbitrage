@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowUpRight, Flame, TrendingUp, AlertTriangle, Pencil, Lock } from 'lucide-react';
+import { PAIR_LEVERAGE } from '../../utils/constants';
 
 export default function ProfitCalculator({ spread, pair, exchangeAndPrice }) {
     // Configuration State with Persistence
@@ -16,27 +17,7 @@ export default function ProfitCalculator({ spread, pair, exchangeAndPrice }) {
         localStorage.setItem('calc_margin_per_side', marginPerSide);
     }, [marginPerSide]);
 
-    const PAIR_LEVERAGE = {
-        'BTC': 50,
-        'ETH': 50,
-        'SOL': 20,
-        'PAXG': 10,
-        'AAVE': 10,
-        'SUI': 10,
-        'XRP': 10,
-        'GRASS': 5,
-        'MYX': 3,
-        'LIT': 5,
-        'RESOLV': 3,
-        'BERA': 5,
-        'KAITO': 5
-    };
-
-    const getLeverage = (symbol) => {
-        return PAIR_LEVERAGE[symbol] || 10; // Default 10x
-    };
-
-    const leverage = getLeverage(pair);
+    const leverage = PAIR_LEVERAGE[pair] || 10;
     const positionSize = marginPerSide * leverage;
 
     // New Simplified Calculation

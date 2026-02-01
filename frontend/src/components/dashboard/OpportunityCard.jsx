@@ -1,9 +1,11 @@
+import React from 'react';
 import { Bell, BellOff, X, TrendingUp } from 'lucide-react';
 import { motion } from 'framer-motion';
 import CryptoIcon from './CryptoIcon';
 import ExchangeIcon from './ExchangeIcon';
+import { PAIR_LEVERAGE } from '../../utils/constants';
 
-export default function OpportunityCard({
+const OpportunityCard = React.memo(({
     row,
     index,
     onSelect,
@@ -14,7 +16,7 @@ export default function OpportunityCard({
     updateThreshold,
     minSpread,
     margin
-}) {
+}) => {
     const spread = row.realSpread || 0;
     const buyEx = row.bestAskEx || 'Unknown';
     const sellEx = row.bestBidEx || 'Unknown';
@@ -23,24 +25,16 @@ export default function OpportunityCard({
     const isAlerting = hasCustomThreshold && spread >= threshold;
     const isSettingsOpen = settingsOpenFor === row.symbol;
 
-    // Leverage Config (duplicated for display)
-    const PAIR_LEVERAGE = {
-        'BTC': 50, 'ETH': 50, 'SOL': 20, 'PAXG': 10,
-        'AAVE': 10, 'SUI': 10, 'XRP': 10, 'GRASS': 5,
-        'MYX': 3, 'LIT': 5, 'RESOLV': 3, 'BERA': 5, 'KAITO': 5
-    };
-
     const leverage = PAIR_LEVERAGE[row.symbol] || 10;
     const estProfit = (margin * leverage) * (spread / 100);
     const isNegligible = estProfit < 1;
 
     return (
         <motion.div
-            layout
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.2 }}
             onClick={() => onSelect(row)}
             className={`
                 border rounded-[20px] shadow-xl hover:-translate-y-1 transition-all duration-200 group cursor-pointer relative overflow-visible p-6
@@ -188,4 +182,17 @@ export default function OpportunityCard({
             </div>
         </motion.div>
     );
-}
+}, (prev, next) => {
+    // Custom comparison to handle the "fresh object reference" issue in App.jsx
+    return (
+        prev.row.symbol === next.row.symbol &&
+        prev.row.realSpread === next.row.realSpread &&
+        prev.row.bestBid === next.row.bestBid &&
+        prev.row.bestAsk === next.row.bestAsk &&
+        prev.settingsOpenFor === next.settingsOpenFor &&
+        prev.hasCustomThreshold === next.hasCustomThreshold &&
+        prev.margin === next.margin
+    );
+});
+
+export default OpportunityCard;

@@ -15,6 +15,7 @@ export { vestService, VestService } from './VestService';
 export { lighterService, LighterService } from './LighterService';
 export { extendedService, ExtendedService } from './ExtendedService';
 export { nadoService, NadoService } from './NadoService';
+export { zerooneService, ZeroOneService } from './ZeroOneService';
 
 import { IExchangeService } from './BaseExchangeService';
 import { paradexService } from './ParadexService';
@@ -22,6 +23,7 @@ import { vestService } from './VestService';
 import { lighterService } from './LighterService';
 import { extendedService } from './ExtendedService';
 import { nadoService } from './NadoService';
+import { zerooneService } from './ZeroOneService';
 
 /**
  * Registry of all available exchange services (using hybrid where available)
@@ -32,7 +34,8 @@ export const EXCHANGE_REGISTRY: Record<string, IExchangeService> = {
     VEST: vestService,
     LIGHTER: lighterService,
     EXTENDED: extendedService,
-    NADO: nadoService
+    NADO: nadoService,
+    ZEROONE: zerooneService
 };
 
 /**

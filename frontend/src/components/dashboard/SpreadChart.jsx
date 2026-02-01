@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Area, AreaChart
 } from 'recharts';
@@ -25,13 +25,6 @@ export default function SpreadChart({ pair, liveData }) {
         } finally {
             setLoading(false);
         }
-    };
-
-    const fetchDbStats = async () => {
-        try {
-            const res = await fetch('/api/debug/data-range');
-            if (res.ok) setDbStats(await res.json());
-        } catch (e) { console.error(e); }
     };
 
     useEffect(() => {
@@ -228,4 +221,4 @@ export default function SpreadChart({ pair, liveData }) {
     );
 }
 
-function StatCard() { return null; }
+
