@@ -53,7 +53,7 @@ export default function SpreadChart({ pair, liveData }) {
                 <div className="bg-gray-900 border border-gray-700 p-3 rounded-lg shadow-xl text-sm z-50">
                     <p className="text-gray-400 mb-1">{new Date(label).toLocaleString()}</p>
                     <div className="flex items-center gap-2 mb-2">
-                        <span className="text-blue-400 font-bold text-lg">{d.spread.toFixed(2)}%</span>
+                        <span className="text-blue-400 font-bold text-lg">{d.spread.toFixed(4)}%</span>
                         <span className="text-xs text-gray-500">Spread</span>
                     </div>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs font-mono">
@@ -108,25 +108,25 @@ export default function SpreadChart({ pair, liveData }) {
                 <div className="flex gap-12 mb-6 border-b border-white/5 pb-4 px-1">
                     <StatItem
                         label="Current Spread"
-                        value={currentSpread !== undefined && currentSpread !== null ? Number(currentSpread).toFixed(2) : '-'}
+                        value={currentSpread !== undefined && currentSpread !== null ? Number(currentSpread).toFixed(4) : '-'}
                         suffix="%"
                         colorClass="text-emerald-400"
                     />
                     <StatItem
                         label={`Average (${period})`}
-                        value={data.stats.average}
+                        value={data.stats.average ? Number(data.stats.average).toFixed(4) : '-'}
                         suffix="%"
                         colorClass="text-white"
                     />
                     <StatItem
                         label="Min"
-                        value={data.stats.min}
+                        value={data.stats.min ? Number(data.stats.min).toFixed(4) : '-'}
                         suffix="%"
                         colorClass="text-red-400"
                     />
                     <StatItem
                         label="Max"
-                        value={data.stats.max}
+                        value={data.stats.max ? Number(data.stats.max).toFixed(4) : '-'}
                         suffix="%"
                         colorClass="text-emerald-400"
                     />
@@ -189,6 +189,7 @@ export default function SpreadChart({ pair, liveData }) {
                                 axisLine={false}
                                 tickLine={false}
                                 dx={-10}
+                                tickFormatter={(value) => value.toFixed(4)}
                             />
                             <Tooltip content={<CustomTooltip />} />
 

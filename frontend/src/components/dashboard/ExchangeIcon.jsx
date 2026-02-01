@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import extendedIcon from '../../assets/extended.png';
+import zerooneIcon from '../../assets/zeroone.png';
 
 const EXCHANGE_DOMAINS = {
     vest: 'vestmarkets.com',
@@ -21,6 +22,16 @@ export default function ExchangeIcon({ exchange, className = "w-5 h-5" }) {
                 src={extendedIcon}
                 alt={exchange}
                 className={`${className} rounded-full bg-gray-800 object-cover`}
+            />
+        );
+    }
+
+    if (name === 'zeroone' || name === '01.xyz') {
+        return (
+            <img
+                src={zerooneIcon}
+                alt={exchange}
+                className={`${className} rounded-full bg-black object-contain`}
             />
         );
     }

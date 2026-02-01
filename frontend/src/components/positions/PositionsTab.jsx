@@ -4,7 +4,10 @@ import CryptoIcon from '../dashboard/CryptoIcon';
 import ExchangeIcon from '../dashboard/ExchangeIcon';
 import { EXCHANGES } from '../../utils/constants';
 
-const PositionRow = React.memo(({ pos, pairs, onRemove, onUpdate, editingId, setEditingId, tempValue, setTempValue }) => {
+const PositionRow = React.memo(({ pos, pairs, onRemove, onUpdate }) => {
+    const [isEditing, setIsEditing] = React.useState(false);
+    const [editValue, setEditValue] = React.useState('');
+
     const getLiveSpread = (symbol) => {
         const pair = pairs.find(p => p.symbol === symbol);
         return pair ? pair.realSpread : null;
@@ -33,19 +36,22 @@ const PositionRow = React.memo(({ pos, pairs, onRemove, onUpdate, editingId, set
         return pnl;
     };
 
-    const handleStartEdit = (pos) => {
-        setEditingId(pos.id);
-        setTempValue(pos.exitTargetSpread.toString());
+    const handleStartEdit = () => {
+        setEditValue(pos.exitTargetSpread.toString());
+        setIsEditing(true);
     };
 
-    const handleSave = (id) => {
-        onUpdate(id, { exitTargetSpread: parseFloat(tempValue) });
-        setEditingId(null);
+    const handleSave = () => {
+        onUpdate(pos.id, { exitTargetSpread: parseFloat(editValue) });
+        setIsEditing(false);
+    };
+
+    const handleCancel = () => {
+        setIsEditing(false);
     };
 
     const liveSpread = getLiveSpread(pos.symbol);
     const isTargetReached = liveSpread !== null && liveSpread <= pos.exitTargetSpread;
-    const isEditing = editingId === pos.id;
     const pnl = calculatePnL(pos);
 
     return (
@@ -163,19 +169,19 @@ const PositionRow = React.memo(({ pos, pairs, onRemove, onUpdate, editingId, set
                                     type="number"
                                     step="0.01"
                                     className="bg-gray-800 border border-blue-500/50 rounded-lg px-2 py-1 text-white font-bold text-lg w-24 focus:outline-none"
-                                    value={tempValue}
-                                    onChange={(e) => setTempValue(e.target.value)}
+                                    value={editValue}
+                                    onChange={(e) => setEditValue(e.target.value)}
                                     onKeyDown={(e) => {
-                                        if (e.key === 'Enter') handleSave(pos.id);
-                                        if (e.key === 'Escape') setEditingId(null);
+                                        if (e.key === 'Enter') handleSave();
+                                        if (e.key === 'Escape') handleCancel();
                                     }}
                                 />
                                 <span className="text-white font-bold opacity-50">%</span>
                                 <div className="flex items-center gap-1 ml-auto">
-                                    <button onClick={() => handleSave(pos.id)} className="p-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg hover:bg-emerald-500/30">
+                                    <button onClick={handleSave} className="p-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg hover:bg-emerald-500/30">
                                         <Check className="w-4 h-4" />
                                     </button>
-                                    <button onClick={() => setEditingId(null)} className="p-1.5 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30">
+                                    <button onClick={handleCancel} className="p-1.5 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30">
                                         <X className="w-4 h-4" />
                                     </button>
                                 </div>
@@ -184,7 +190,7 @@ const PositionRow = React.memo(({ pos, pairs, onRemove, onUpdate, editingId, set
                             <div className="flex items-center group/target">
                                 <span className="text-lg font-bold text-white">≤ {pos.exitTargetSpread}%</span>
                                 <button
-                                    onClick={() => handleStartEdit(pos)}
+                                    onClick={handleStartEdit}
                                     className="ml-3 p-1 text-gray-600 hover:text-blue-400 opacity-0 group-hover/target:opacity-100 transition-all"
                                 >
                                     <Edit2 className="w-3.5 h-3.5" />
@@ -217,7 +223,6 @@ const PositionRow = React.memo(({ pos, pairs, onRemove, onUpdate, editingId, set
     return (
         prev.pos.id === next.pos.id &&
         prev.pos.exitTargetSpread === next.pos.exitTargetSpread &&
-        prev.editingId === next.editingId &&
         prevPair?.realSpread === nextPair?.realSpread &&
         prevPair?.vest?.bid === nextPair?.vest?.bid && // Simple check for price stability
         prevPair?.paradex?.ask === nextPair?.paradex?.ask
@@ -225,9 +230,6 @@ const PositionRow = React.memo(({ pos, pairs, onRemove, onUpdate, editingId, set
 });
 
 export default function PositionsTab({ positions, pairs, onRemove, onUpdate }) {
-    const [editingId, setEditingId] = React.useState(null);
-    const [tempValue, setTempValue] = React.useState('');
-
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="flex justify-between items-end mb-2">
@@ -256,10 +258,6 @@ export default function PositionsTab({ positions, pairs, onRemove, onUpdate }) {
                             pairs={pairs}
                             onRemove={onRemove}
                             onUpdate={onUpdate}
-                            editingId={editingId}
-                            setEditingId={setEditingId}
-                            tempValue={tempValue}
-                            setTempValue={setTempValue}
                         />
                     ))}
                 </div>

@@ -60,7 +60,7 @@ export async function getSpreadHistoryController(req: Request, res: Response) {
 
                     return {
                         timestamp: new Date(bucket.timestamp).toISOString(),
-                        spread: parseFloat(avg(bucket.spreads).toFixed(2)), // AVERAGE Spread rule (Smoother)
+                        spread: parseFloat(avg(bucket.spreads).toFixed(4)), // AVERAGE Spread rule (Smoother)
                         lighter_price: parseFloat(avg(bucket.best_asks).toFixed(2)),
                         vest_price: parseFloat(avg(bucket.best_bids).toFixed(2))
                     };
@@ -85,10 +85,10 @@ export async function getSpreadHistoryController(req: Request, res: Response) {
             const percentile = Math.round((rank / fullSpreads.length) * 100);
 
             stats = {
-                current: parseFloat(current.toFixed(2)),
-                average: parseFloat(average.toFixed(2)),
-                min: parseFloat(min.toFixed(2)),
-                max: parseFloat(max.toFixed(2)),
+                current: parseFloat(current.toFixed(4)),
+                average: parseFloat(average.toFixed(4)),
+                min: parseFloat(min.toFixed(4)),
+                max: parseFloat(max.toFixed(4)),
                 percentile
             };
         }

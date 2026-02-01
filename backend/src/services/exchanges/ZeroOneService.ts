@@ -74,7 +74,7 @@ export class ZeroOneService extends HybridExchangeService {
                 }
             });
 
-            logger.info(this.name, `Mapped ${relevantMarkets.length} relevant markets (from ${data.markets.length} total)`);
+            logger.debug(this.name, `Mapped ${relevantMarkets.length} relevant markets (from ${data.markets.length} total)`);
 
             // 3. Fetch Prices (via Orderbook for each relevant market)
             const marketData: MarketData[] = [];
