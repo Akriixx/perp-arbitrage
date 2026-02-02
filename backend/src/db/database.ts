@@ -61,7 +61,7 @@ export function saveSpread({ symbol, spread, bestBid, bestAsk, bestBidEx, bestAs
  * @param {string} symbol 
  * @param {string} period '24h', '7d', '14d', 'all'
  */
-export function getSpreadHistory(symbol: string, period: string = '24h'): Promise<any[]> {
+export function getSpreadHistory(symbol: string, period: string = '24h', bidEx?: string, askEx?: string): Promise<any[]> {
     return new Promise((resolve, reject) => {
         let timeModifier = '-24 hours';
 
@@ -73,7 +73,7 @@ export function getSpreadHistory(symbol: string, period: string = '24h'): Promis
             default: timeModifier = '-24 hours';
         }
 
-        const sql = `
+        let sql = `
             SELECT 
                 timestamp,
                 spread,
@@ -84,10 +84,23 @@ export function getSpreadHistory(symbol: string, period: string = '24h'): Promis
             FROM spread_history
             WHERE symbol = ? 
             AND timestamp >= datetime('now', ?)
-            ORDER BY timestamp ASC
         `;
 
-        db.all(sql, [symbol, timeModifier], (err, rows) => {
+        const params = [symbol, timeModifier];
+
+        if (bidEx) {
+            sql += ` AND bid_exchange = ?`;
+            params.push(bidEx.toUpperCase());
+        }
+
+        if (askEx) {
+            sql += ` AND ask_exchange = ?`;
+            params.push(askEx.toUpperCase());
+        }
+
+        sql += ` ORDER BY timestamp ASC`;
+
+        db.all(sql, params, (err, rows) => {
             if (err) {
                 logger.error(TAG, 'Query error', err);
                 reject(err);

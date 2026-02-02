@@ -14,8 +14,13 @@ const TAG = 'API';
  * Returns all pairs with current prices
  */
 export function getScans(req: Request, res: Response) {
-    const pairs = Object.values(getPriceCache());
-    res.json({ pairs });
+    try {
+        const pairs = Object.values(getPriceCache());
+        res.json({ pairs });
+    } catch (error) {
+        logger.error(TAG, 'Error in getScans', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
 }
 
 /**

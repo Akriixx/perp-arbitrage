@@ -5,7 +5,7 @@ import { logger } from '../utils/app-logger';
 const TAG = 'History';
 
 export async function getSpreadHistoryController(req: Request, res: Response) {
-    const { pair, period = '24h' } = req.query;
+    const { pair, period = '24h', bidEx, askEx } = req.query;
 
     if (!pair) {
         return res.status(400).json({ error: 'Pair is required' });
@@ -13,8 +13,15 @@ export async function getSpreadHistoryController(req: Request, res: Response) {
 
     try {
         const periodStr = period as string;
-        logger.debug(TAG, `Fetching history for ${pair} (${periodStr})`);
-        const rows = await getSpreadHistory(pair as string, periodStr);
+        // MAPPING FIX: Frontend sends '01.XYZ', DB has 'ZEROONE'
+        let bidExStr = bidEx as string | undefined;
+        let askExStr = askEx as string | undefined;
+
+        if (bidExStr === '01.XYZ' || bidExStr === '01.xyz') bidExStr = 'ZEROONE';
+        if (askExStr === '01.XYZ' || askExStr === '01.xyz') askExStr = 'ZEROONE';
+
+        logger.debug(TAG, `Fetching history for ${pair} (${periodStr}) [${bidExStr || '*'} -> ${askExStr || '*'}]`);
+        const rows = await getSpreadHistory(pair as string, periodStr, bidExStr, askExStr);
 
         // --- ADAPTIVE GRANULARITY CONFIG ---
         // --- ADAPTIVE GRANULARITY CONFIG (User Requested) ---

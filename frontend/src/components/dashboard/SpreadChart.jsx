@@ -4,7 +4,7 @@ import {
 } from 'recharts';
 import { Loader2 } from 'lucide-react';
 
-export default function SpreadChart({ pair, liveData }) {
+export default function SpreadChart({ pair, liveData, bidEx, askEx }) {
     const [period, setPeriod] = useState('24h');
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -16,7 +16,10 @@ export default function SpreadChart({ pair, liveData }) {
     const fetchHistory = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`/api/spread-history?pair=${pair}&period=${period}`);
+            let url = `/api/spread-history?pair=${pair}&period=${period}`;
+            if (bidEx) url += `&bidEx=${bidEx}`;
+            if (askEx) url += `&askEx=${askEx}`;
+            const res = await fetch(url);
             if (!res.ok) throw new Error('Failed to fetch history');
             const json = await res.json();
             setData(json);
@@ -31,7 +34,7 @@ export default function SpreadChart({ pair, liveData }) {
         fetchHistory();
         const interval = setInterval(fetchHistory, 60000); // Update every minute
         return () => clearInterval(interval);
-    }, [pair, period]);
+    }, [pair, period, bidEx, askEx]);
 
     const periods = ['24h', '7d', '14d', 'all'];
 
@@ -49,18 +52,27 @@ export default function SpreadChart({ pair, liveData }) {
     const CustomTooltip = ({ active, payload, label }) => {
         if (active && payload && payload.length) {
             const d = payload[0].payload;
+            const isPositive = d.spread >= 0;
             return (
                 <div className="bg-gray-900 border border-gray-700 p-3 rounded-lg shadow-xl text-sm z-50">
                     <p className="text-gray-400 mb-1">{new Date(label).toLocaleString()}</p>
                     <div className="flex items-center gap-2 mb-2">
-                        <span className="text-blue-400 font-bold text-lg">{d.spread.toFixed(4)}%</span>
+                        <span className={`font-bold text-lg ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {d.spread > 0 ? '+' : ''}{d.spread.toFixed(4)}%
+                        </span>
                         <span className="text-xs text-gray-500">Spread</span>
                     </div>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs font-mono">
-                        <span className="text-gray-500">Lighter:</span>
+                        <span className="text-gray-500 uppercase">{askEx || 'AskEx'}:</span>
                         <span className="text-white">${d.lighter_price?.toFixed(2)}</span>
-                        <span className="text-gray-500">Vest:</span>
+                        <span className="text-gray-500 uppercase">{bidEx || 'BidEx'}:</span>
                         <span className="text-white">${d.vest_price?.toFixed(2)}</span>
+                    </div>
+                    <div className="mt-2 text-[10px] text-gray-400 uppercase tracking-wider">
+                        {isPositive
+                            ? `LONG ${askEx} / SHORT ${bidEx}`
+                            : `SHORT ${askEx} / LONG ${bidEx}`
+                        }
                     </div>
                 </div>
             );
@@ -77,13 +89,41 @@ export default function SpreadChart({ pair, liveData }) {
         </div>
     );
 
+    // Prepare data with live update
+    const chartData = data?.data ? (() => {
+        if (!data.data || data.data.length === 0 || !liveData) return data.data;
+        const newData = [...data.data];
+        const lastIndex = newData.length - 1;
+        newData[lastIndex] = {
+            ...newData[lastIndex],
+            spread: liveData.realSpread,
+            lighter_price: liveData.bestAsk || newData[lastIndex].lighter_price,
+            vest_price: liveData.bestBid || newData[lastIndex].vest_price
+        };
+        return newData;
+    })() : [];
+
+    // Gradient calculation
+    const gradientOffset = () => {
+        if (!chartData || chartData.length === 0) return 0;
+        const dataMax = Math.max(...chartData.map((i) => i.spread));
+        const dataMin = Math.min(...chartData.map((i) => i.spread));
+
+        if (dataMax <= 0) return 0;
+        if (dataMin >= 0) return 1;
+
+        return dataMax / (dataMax - dataMin);
+    };
+
+    const off = gradientOffset();
+
     return (
-        <div className="bg-[#0f111a] h-full flex flex-col p-4 rounded-lg">
+        <div className="bg-[#0f111a] h-full flex flex-col p-4 rounded-lg relative">
             {/* Top Bar: Title & Controls */}
             <div className="flex justify-between items-start mb-6">
                 <div>
                     <h3 className="text-white font-bold text-xl flex items-baseline gap-2">
-                        {pair.split('-')[0]} <span className="text-gray-500 text-sm font-normal uppercase">SPREAD (VEST VS LIGHTER)</span>
+                        {pair.split('-')[0]} <span className="text-gray-500 text-sm font-normal uppercase">SPREAD ({bidEx || 'BEST'} VS {askEx || 'BEST'})</span>
                     </h3>
                 </div>
 
@@ -108,9 +148,9 @@ export default function SpreadChart({ pair, liveData }) {
                 <div className="flex gap-12 mb-6 border-b border-white/5 pb-4 px-1">
                     <StatItem
                         label="Current Spread"
-                        value={currentSpread !== undefined && currentSpread !== null ? Number(currentSpread).toFixed(4) : '-'}
+                        value={currentSpread !== undefined && currentSpread !== null ? (currentSpread > 0 ? '+' : '') + Number(currentSpread).toFixed(4) : '-'}
                         suffix="%"
-                        colorClass="text-emerald-400"
+                        colorClass={currentSpread >= 0 ? "text-emerald-400" : "text-red-400"}
                     />
                     <StatItem
                         label={`Average (${period})`}
@@ -139,8 +179,10 @@ export default function SpreadChart({ pair, liveData }) {
                 </div>
             )}
 
+            {/* Removed Direction Labels Overlay as requested */}
+
             {/* Chart */}
-            <div className="flex-1 min-h-[300px] relative">
+            <div className="flex-1 min-h-[300px] relative z-10">
                 {loading && !data && (
                     <div className="absolute inset-0 flex items-center justify-center z-10 bg-[#0f111a]/80">
                         <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
@@ -149,25 +191,15 @@ export default function SpreadChart({ pair, liveData }) {
 
                 {data?.data && (
                     <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={(() => {
-                            if (!data.data || data.data.length === 0 || !liveData) return data.data;
-                            // Create a shallow copy of the array to avoid mutating state
-                            const newData = [...data.data];
-                            // Update the last point with real-time data
-                            const lastIndex = newData.length - 1;
-                            newData[lastIndex] = {
-                                ...newData[lastIndex],
-                                spread: liveData.realSpread,
-                                // Update individual prices if available in liveData
-                                lighter_price: liveData.bestAsk || newData[lastIndex].lighter_price,
-                                vest_price: liveData.bestBid || newData[lastIndex].vest_price
-                            };
-                            return newData;
-                        })()}>
+                        <AreaChart data={chartData}>
                             <defs>
-                                <linearGradient id="colorSpread" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
-                                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                                <linearGradient id="splitColorFill" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset={off} stopColor="#10b981" stopOpacity={0.35} />
+                                    <stop offset={off} stopColor="#ef4444" stopOpacity={0.35} />
+                                </linearGradient>
+                                <linearGradient id="splitColorStroke" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset={off} stopColor="#10b981" stopOpacity={1} />
+                                    <stop offset={off} stopColor="#ef4444" stopOpacity={1} />
                                 </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
@@ -193,26 +225,26 @@ export default function SpreadChart({ pair, liveData }) {
                             />
                             <Tooltip content={<CustomTooltip />} />
 
-                            {/* 0% Baseline */}
-                            <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="3 3" />
-
-                            {/* Average Line */}
-                            <ReferenceLine
-                                y={data.stats.average}
-                                stroke="#10b981"
-                                strokeDasharray="3 3"
-                                label={{ value: 'Avg', fill: '#10b981', fontSize: 10, position: 'right' }}
-                            />
+                            {/* 0% Baseline - Stronger visual */}
+                            <ReferenceLine y={0} stroke="#6b7280" strokeWidth={1} />
+                            <ReferenceLine y={0} stroke="#10b981" strokeDasharray="3 3" strokeOpacity={0.5} />
 
                             <Area
                                 type="monotone"
                                 dataKey="spread"
-                                stroke="#3b82f6"
-                                strokeWidth={2}
-                                fillOpacity={1}
-                                fill="url(#colorSpread)"
+                                stroke="none"
+                                fill="url(#splitColorFill)"
                                 connectNulls={true}
                                 activeDot={{ r: 4, stroke: 'white', strokeWidth: 2, fill: '#3b82f6' }}
+                            />
+                            {/* Add a line on top for sharpness */}
+                            <Line
+                                type="monotone"
+                                dataKey="spread"
+                                stroke="url(#splitColorStroke)"
+                                strokeWidth={2}
+                                dot={false}
+                                connectNulls={true}
                             />
                         </AreaChart>
                     </ResponsiveContainer>
@@ -221,5 +253,3 @@ export default function SpreadChart({ pair, liveData }) {
         </div>
     );
 }
-
-

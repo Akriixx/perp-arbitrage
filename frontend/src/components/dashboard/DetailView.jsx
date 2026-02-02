@@ -59,7 +59,12 @@ export default function DetailView({ pair, data, onClose }) {
                     {/* Chart Section (70% on desktop -> col-span-8) */}
                     <div className="lg:col-span-8 flex flex-col min-h-[400px]">
                         <div className="bg-[#1a1a1a] rounded-xl border border-gray-800 p-1 flex-1 shadow-lg">
-                            <SpreadChart pair={pair} liveData={data} />
+                            <SpreadChart
+                                pair={pair}
+                                liveData={data}
+                                bidEx={data.bestBidEx}
+                                askEx={data.bestAskEx}
+                            />
                         </div>
                     </div>
 

@@ -133,38 +133,64 @@ function performBroadcast() {
  * Update cache and recalculate spreads
  */
 function updateAndRecalculate() {
-    const now = Date.now();
+    try {
+        const now = Date.now();
 
-    // Calculate spreads using only fresh data
-    // Note: calculateSpreads modifies the cache object in place
-    calculateSpreads(PRICE_CACHE, (exchange: string, data: ExchangePrice) => {
-        return isFresh(data.timestamp);
-    });
+        // Calculate spreads using only fresh data
+        // Note: calculateSpreads modifies the cache object in place
+        calculateSpreads(PRICE_CACHE, (exchange: string, data: ExchangePrice) => {
+            return isFresh(data.timestamp);
+        });
 
-    // Save to DB, check for alerts
-    Object.values(PRICE_CACHE).forEach(pair => {
-        if (pair.bestBid > 0 && pair.bestAsk > 0) {
+        // Save to DB (ALL combinations) and check for alerts (Best only)
+        Object.values(PRICE_CACHE).forEach(pair => {
             const lastSave = lastDbSave.get(pair.symbol) || 0;
+            const shouldSave = (now - lastSave >= DB_SAVE_THROTTLE);
 
-            if (now - lastSave >= DB_SAVE_THROTTLE) {
-                saveSpread({
-                    symbol: pair.symbol,
-                    spread: pair.realSpread,
-                    bestBid: pair.bestBid,
-                    bestAsk: pair.bestAsk,
-                    bestBidEx: pair.bestBidEx,
-                    bestAskEx: pair.bestAskEx
+            if (shouldSave) {
+                const exchanges = getAllExchanges();
+                // 1. Save ALL valid combinations
+                exchanges.forEach(bidExService => {
+                    const bidExName = bidExService.name.toLowerCase();
+                    const bidData = (pair as any)[bidExName] as ExchangePrice;
+
+                    if (!bidData || bidData.bid <= 0 || !isFresh(bidData.timestamp)) return;
+
+                    exchanges.forEach(askExService => {
+                        const askExName = askExService.name.toLowerCase();
+                        if (bidExName === askExName) return;
+
+                        const askData = (pair as any)[askExName] as ExchangePrice;
+                        if (!askData || askData.ask <= 0 || !isFresh(askData.timestamp)) return;
+
+                        // Calculate spread for this specific combo
+                        const spread = ((bidData.bid - askData.ask) / askData.ask) * 100;
+
+                        // Save record
+                        saveSpread({
+                            symbol: pair.symbol,
+                            spread: spread,
+                            bestBid: bidData.bid,
+                            bestAsk: askData.ask,
+                            bestBidEx: bidExService.name.toUpperCase(),
+                            bestAskEx: askExService.name.toUpperCase()
+                        });
+                    });
                 });
+
                 lastDbSave.set(pair.symbol, now);
             }
 
-            if (pair.realSpread >= ALERT_THRESHOLD) {
+            // 2. Alert logic (Keep on BEST spread only to avoid spam)
+            if (pair.bestBid > 0 && pair.bestAsk > 0 && pair.realSpread >= ALERT_THRESHOLD) {
                 saveAlert(pair).catch((err: any) => logger.error(TAG, 'Failed to save alert', err));
             }
-        }
-    });
+        });
 
-    throttledBroadcast();
+        throttledBroadcast();
+    } catch (e) {
+        logger.error(TAG, 'Critical error in updateAndRecalculate', e);
+    }
 }
 
 /**
