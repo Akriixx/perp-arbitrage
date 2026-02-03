@@ -230,7 +230,7 @@ export default function SpreadChart({ pair, liveData, bidEx, askEx }) {
                             <ReferenceLine y={0} stroke="#10b981" strokeDasharray="3 3" strokeOpacity={0.5} />
 
                             <Area
-                                type="monotone"
+                                type="linear"
                                 dataKey="spread"
                                 stroke="none"
                                 fill="url(#splitColorFill)"
@@ -239,7 +239,7 @@ export default function SpreadChart({ pair, liveData, bidEx, askEx }) {
                             />
                             {/* Add a line on top for sharpness */}
                             <Line
-                                type="monotone"
+                                type="linear"
                                 dataKey="spread"
                                 stroke="url(#splitColorStroke)"
                                 strokeWidth={2}

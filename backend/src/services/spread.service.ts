@@ -62,10 +62,10 @@ export const calculateSpreads = (cache: any, validator: ((ex: string, data: any)
             item.bestBidEx !== item.bestAskEx) {
             item.realSpread = ((item.bestBid - item.bestAsk) / item.bestAsk) * 100;
 
-            // Profit calculation for $1000 trade (0.1% fee per side)
+            // Profit calculation for $1000 trade (0.05% fee total = 0.025% per side)
             const units = 1000 / item.bestAsk;
             const grossSale = units * item.bestBid;
-            const fees = (1000 * 0.001) + (grossSale * 0.001);
+            const fees = (1000 * 0.00025) + (grossSale * 0.00025);
             item.potentialProfit = grossSale - fees - 1000;
         } else {
             // Same exchange or missing data - no valid arbitrage

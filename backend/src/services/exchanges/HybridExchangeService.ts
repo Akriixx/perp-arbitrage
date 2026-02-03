@@ -177,10 +177,10 @@ export abstract class HybridExchangeService extends EventEmitter implements IExc
         // Initial fetch
         this.doFallbackFetch();
 
-        // Poll every 2 seconds
+        // Poll every 1 second (increased from 2s to capture more volatility)
         this.fallbackInterval = setInterval(() => {
             this.doFallbackFetch();
-        }, 2000);
+        }, 1000);
     }
 
     /**

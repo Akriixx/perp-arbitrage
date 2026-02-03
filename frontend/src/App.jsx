@@ -1,96 +1,59 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback } from 'react';
 import { AnimatePresence } from 'framer-motion';
+
+// Layout & Views
+import MainLayout from './components/layout/MainLayout';
+import ScannerView from './views/ScannerView';
+import PositionsView from './views/PositionsView';
+
+// Components
 import DetailView from './components/dashboard/DetailView';
-import DashboardHeader from './components/dashboard/DashboardHeader';
-import Sidebar from './components/layout/Sidebar';
-import OpportunityCard from './components/dashboard/OpportunityCard';
-import PositionsTab from './components/positions/PositionsTab';
 import AddPositionModal from './components/positions/AddPositionModal';
 import ExitAlarmModal from './components/positions/ExitAlarmModal';
 import ScannerAlarmModal from './components/dashboard/ScannerAlarmModal';
 import ActiveAlarmsModal from './components/dashboard/ActiveAlarmsModal';
 import TrackRecordTab from './components/track/TrackRecordTab';
+
+// Hooks
 import useMarketData from './hooks/useMarketData';
 import { useAlerts } from './hooks/useAlerts';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { useAppAlarms } from './hooks/useAppAlarms';
-import { ACTIVE_EXCHANGES_LIST, EXCHANGES, AVAILABLE_SYMBOLS } from './utils/constants';
+import { useArbitrageEngine } from './hooks/useArbitrageEngine';
+import { ACTIVE_EXCHANGES_LIST, AVAILABLE_SYMBOLS } from './utils/constants';
 
 function App() {
   const [activeTab, setActiveTab] = useState('scanner');
   const [selectedPair, setSelectedPair] = useState(null);
-  const [settingsOpenFor, setSettingsOpenFor] = useState(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isActiveAlarmsModalOpen, setIsActiveAlarmsModalOpen] = useState(false);
 
   // --- State with Persistence ---
-  // Initialize from constant list to ensure all are enabled by default
   const defaultExchanges = ACTIVE_EXCHANGES_LIST.reduce((acc, ex) => ({ ...acc, [ex]: true }), {});
   const [storedExchanges, setStoredExchanges] = useLocalStorage('enabled_exchanges', defaultExchanges);
 
-  // Merge stored with default to ensure new keys appear
+  // Merge stored with default
   const enabledExchanges = { ...defaultExchanges, ...storedExchanges };
   const setEnabledExchanges = setStoredExchanges;
+
   const [pairThresholds, setPairThresholds] = useLocalStorage('pair_thresholds', {});
   const [disabledAlarms, setDisabledAlarms] = useLocalStorage('disabled_alarms', []);
   const [trades, setTrades] = useLocalStorage('track_trades', []);
   const [initialInvestment, setInitialInvestment] = useLocalStorage('initial_investment', 1000);
   const [positions, setPositions] = useLocalStorage('active_positions', []);
-
   const [marginPerSide, setMarginPerSide] = useLocalStorage('calc_margin_per_side', 1000);
 
   const { pairs, isLoading, error, refresh, refreshInterval, setRefreshInterval } = useMarketData();
   const { minSpread, soundEnabled } = useAlerts();
 
-  // Helper functions
-  const isMonitored = useCallback((symbol) => pairThresholds.hasOwnProperty(symbol), [pairThresholds]);
-  const getAlertThreshold = useCallback((symbol) => pairThresholds[symbol] !== undefined ? pairThresholds[symbol] : minSpread, [pairThresholds, minSpread]);
-
-  // Derived Data: Dynamic Spreads
-  const exchangesMap = useMemo(() => {
-    return EXCHANGES.reduce((acc, ex) => ({ ...acc, [ex.id]: ex.name.toUpperCase() }), {});
-  }, []);
-
-  const getDynamicSpread = useCallback((pair) => {
-    let maxBid = 0, maxBidEx = null;
-    let minAsk = Infinity, minAskEx = null;
-
-    ACTIVE_EXCHANGES_LIST.forEach(ex => {
-      if (!enabledExchanges[ex]) return;
-      const bid = pair[ex]?.bid || 0;
-      const ask = pair[ex]?.ask || 0;
-      if (bid > maxBid) {
-        maxBid = bid;
-        maxBidEx = exchangesMap[ex] || ex.toUpperCase();
-      }
-      if (ask > 0 && ask < minAsk) {
-        minAsk = ask;
-        minAskEx = exchangesMap[ex] || ex.toUpperCase();
-      }
-    });
-
-    if (maxBid > 0 && minAsk !== Infinity) {
-      return { realSpread: ((maxBid - minAsk) / minAsk) * 100, bestBid: maxBid, bestAsk: minAsk, bestBidEx: maxBidEx, bestAskEx: minAskEx };
-    }
-    return { realSpread: -999, bestBid: 0, bestAsk: 0, bestBidEx: null, bestAskEx: null };
-  }, [enabledExchanges]);
-
-  // Memoized Data
-  const dynamicPairs = useMemo(() => pairs.map(p => ({ ...p, ...getDynamicSpread(p) })), [pairs, getDynamicSpread]);
-  const monitoredCount = useMemo(() => dynamicPairs.filter(p => isMonitored(p.symbol)).length, [dynamicPairs, isMonitored]);
-
-  // Show all pairs, sorted by spread (alerting pairs first)
-  const sortedData = useMemo(() => {
-    return [...dynamicPairs].sort((a, b) => {
-      const aThreshold = getAlertThreshold(a.symbol);
-      const bThreshold = getAlertThreshold(b.symbol);
-      const aAlerting = isMonitored(a.symbol) && a.realSpread >= aThreshold;
-      const bAlerting = isMonitored(b.symbol) && b.realSpread >= bThreshold;
-      if (aAlerting && !bAlerting) return -1;
-      if (!aAlerting && bAlerting) return 1;
-      return (b.realSpread || -999) - (a.realSpread || -999);
-    });
-  }, [dynamicPairs, isMonitored, getAlertThreshold]);
+  // --- Core Engine Logic ---
+  const {
+    dynamicPairs,
+    sortedData,
+    monitoredCount,
+    getAlertThreshold,
+    isMonitored
+  } = useArbitrageEngine(pairs, enabledExchanges, pairThresholds, minSpread);
 
   // --- Actions ---
   const addPosition = useCallback((pos) => setPositions(prev => [...prev, pos]), [setPositions]);
@@ -98,9 +61,6 @@ function App() {
   const updatePosition = useCallback((id, updates) => {
     setPositions(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
   }, [setPositions]);
-
-  const handleOpenAddModal = useCallback(() => setIsAddModalOpen(true), []);
-  const handleCloseAddModal = useCallback(() => setIsAddModalOpen(false), []);
 
   const addTrade = (trade) => setTrades(prev => [trade, ...prev]);
   const removeTrade = (id) => setTrades(prev => prev.filter(t => t.id !== id));
@@ -113,7 +73,6 @@ function App() {
       else next[symbol] = parseFloat(newValue);
       return next;
     });
-    setSettingsOpenFor(null);
   };
 
   const toggleDisabledAlarm = (symbol) => {
@@ -134,68 +93,30 @@ function App() {
     stopScannerAlarm
   } = useAppAlarms(dynamicPairs, pairThresholds, minSpread, positions, updatePosition, soundEnabled, disabledAlarms);
 
-
-  // --- Render ---
+  // --- Routing / View Selection ---
   const renderContent = () => {
     if (activeTab === 'scanner') {
       return (
-        <>
-          {/* MARGIN SELECTION BAR */}
-          <div className="flex items-center justify-start gap-4 mb-10 pl-2">
-            <span className="text-gray-400 text-xs font-bold tracking-widest uppercase">Margin Per Side</span>
-            <div className="bg-[#1a1a1a] p-1 rounded-xl flex gap-1 border border-[#2a2a2a]">
-              {[500, 1000, 2500, 5000].map(val => (
-                <button
-                  key={val}
-                  onClick={() => setMarginPerSide(val)}
-                  className={`
-                    px-4 py-1.5 rounded-lg text-sm font-bold transition-all duration-200
-                    ${marginPerSide === val
-                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
-                      : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'
-                    }
-                  `}
-                >
-                  ${val}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {!isLoading && sortedData.length === 0 && !error && (
-            <div className="text-center py-32 opacity-50">
-              <p className="text-2xl font-light">No opportunities found.</p>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-            <AnimatePresence mode="popLayout">
-              {sortedData.map((row, i) => (
-                <OpportunityCard
-                  key={row.symbol || i}
-                  row={row}
-                  index={i}
-                  margin={marginPerSide}
-                  onSelect={setSelectedPair}
-                  settingsOpenFor={settingsOpenFor}
-                  setSettingsOpenFor={setSettingsOpenFor}
-                  getAlertThreshold={getAlertThreshold}
-                  hasCustomThreshold={pairThresholds.hasOwnProperty(row.symbol)}
-                  updateThreshold={updateThreshold}
-                  minSpread={minSpread}
-                />
-              ))}
-            </AnimatePresence>
-          </div>
-        </>
+        <ScannerView
+          sortedData={sortedData}
+          isLoading={isLoading}
+          error={error}
+          marginPerSide={marginPerSide}
+          setMarginPerSide={setMarginPerSide}
+          pairThresholds={pairThresholds}
+          updateThreshold={updateThreshold}
+          getAlertThreshold={getAlertThreshold}
+          minSpread={minSpread}
+          onSelectPair={setSelectedPair}
+        />
       );
     } else if (activeTab === 'positions') {
       return (
-        <PositionsTab
+        <PositionsView
           positions={positions}
-          pairs={dynamicPairs}
-          onRemove={removePosition}
-          onUpdate={updatePosition}
+          dynamicPairs={dynamicPairs}
+          removePosition={removePosition}
+          updatePosition={updatePosition}
         />
       );
     } else if (activeTab === 'trackRecord') {
@@ -212,46 +133,28 @@ function App() {
   };
 
   return (
-    <div className="flex h-screen bg-[#0f1117] text-white font-sans selection:bg-blue-500/30 overflow-hidden">
-      {/* Sidebar - Fixed Left */}
-      <Sidebar
+    <>
+      <MainLayout
         enabledExchanges={enabledExchanges}
         setEnabledExchanges={setEnabledExchanges}
         isLoading={isLoading}
-      />
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        refreshInterval={refreshInterval}
+        setRefreshInterval={setRefreshInterval}
+        refresh={refresh}
+        onAddPosition={() => setIsAddModalOpen(true)}
+        monitoredCount={monitoredCount}
+        onOpenAlarms={() => setIsActiveAlarmsModalOpen(true)}
+        error={error}
+      >
+        {renderContent()}
+      </MainLayout>
 
-      {/* Main Content - Scrollable Right */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <div className="overflow-y-auto custom-scrollbar flex-1 h-full">
-          <DashboardHeader
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-            refreshInterval={refreshInterval}
-            setRefreshInterval={setRefreshInterval}
-            refresh={refresh}
-            isLoading={isLoading}
-            onAddPosition={handleOpenAddModal}
-            monitoredCount={monitoredCount}
-            onOpenAlarms={() => setIsActiveAlarmsModalOpen(true)}
-          />
-
-          <div className="max-w-[1600px] mx-auto px-6 pb-20">
-            {error && (
-              <div className="bg-red-500/10 border border-red-500/20 text-red-200 p-6 rounded-2xl mb-8 text-center backdrop-blur-sm">
-                <p className="font-bold text-lg mb-2">Connection Error</p>
-                <p className="opacity-80">{error}</p>
-              </div>
-            )}
-
-            {renderContent()}
-
-          </div>
-        </div>
-      </div>
-
+      {/* Modals & Overlays */}
       <AddPositionModal
         isOpen={isAddModalOpen}
-        onClose={handleCloseAddModal}
+        onClose={() => setIsAddModalOpen(false)}
         onAdd={addPosition}
         symbols={AVAILABLE_SYMBOLS}
       />
@@ -266,16 +169,6 @@ function App() {
         )}
       </AnimatePresence>
 
-      <style>{`
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-pulse-slow { animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
-        @keyframes pulse-slow { 0%, 100% { opacity: 1; } 50% { opacity: .75; } }
-        /* Custom Scrollbar */
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #444; }
-      `}</style>
       <ExitAlarmModal
         position={activeAlarm}
         onConfirm={stopAlarm}
@@ -292,7 +185,7 @@ function App() {
         toggleAlarm={toggleDisabledAlarm}
         removeAlarm={(symbol) => updateThreshold(symbol, null)}
       />
-    </div>
+    </>
   );
 }
 

@@ -29,9 +29,11 @@ export async function getSpreadHistoryController(req: Request, res: Response) {
         if (periodStr === '7d') interval = 15; // 15 min for 7d
         else if (periodStr === '14d' || periodStr === 'all') interval = 30; // 30 min for 14d
 
-        // --- DOWNSAMPLING LOGIC (Bucket Averaging) ---
+        // --- DOWNSAMPLING LOGIC (Peak Preservation) ---
+        // Instead of averaging (which smooths out volatility), we pick the "extreme" point
+        // in each bucket (max absolute spread) to preserve visual spikes.
         function downsampleData(rawData: any[], intervalMinutes: number) {
-            const buckets: Record<string, any> = {};
+            const buckets: Record<string, any[]> = {};
             const intervalMs = intervalMinutes * 60 * 1000;
 
             rawData.forEach(point => {
@@ -46,30 +48,52 @@ export async function getSpreadHistoryController(req: Request, res: Response) {
                 const key = bucketTime.toString();
 
                 if (!buckets[key]) {
-                    buckets[key] = {
-                        timestamp: bucketTime,
-                        spreads: [],
-                        best_asks: [],
-                        best_bids: []
-                    };
+                    buckets[key] = [];
                 }
 
-                buckets[key].spreads.push(point.spread);
-                if (point.best_ask) buckets[key].best_asks.push(point.best_ask);
-                if (point.best_bid) buckets[key].best_bids.push(point.best_bid);
+                // Store full object to keep correlation between spread and prices
+                buckets[key].push({
+                    spread: point.spread,
+                    best_ask: point.best_ask,
+                    best_bid: point.best_bid
+                });
             });
 
-            return Object.values(buckets)
-                .sort((a, b) => a.timestamp - b.timestamp)
-                .map(bucket => {
-                    const avg = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
-                    const max = (arr: number[]) => arr.length ? Math.max(...arr) : 0;
+            return Object.entries(buckets)
+                .sort(([tsA], [tsB]) => Number(tsA) - Number(tsB))
+                .map(([timestamp, points]) => {
+                    // Calculate Average for the bucket
+                    const sum = points.reduce((acc, p) => acc + p.spread, 0);
+                    const avg = sum / points.length;
+
+                    // Find Peak (max absolute deviation from zero)
+                    const peakPoint = points.reduce((prev, current) => {
+                        return Math.abs(current.spread) > Math.abs(prev.spread) ? current : prev;
+                    });
+
+                    // Hybrid Selection: Use Peak ONLY if it deviates significantly (> 0.15%)
+                    // AND persists for a minimum duration (approx 20-30s)
+
+                    // 1. Identify all points in this bucket that qualify as "spikes"
+                    const spikeCandidates = points.filter(p => Math.abs(p.spread - avg) > 0.15);
+
+                    // 2. Check duration (Approx 1 point = 1 second via polling)
+                    // limit to 20 points (~20-30s) to be safe against missed polls while filtering 7s flashes
+                    const hasSustainedDuration = spikeCandidates.length >= 20;
+
+                    // 3. Final Decision
+                    const finalSpread = hasSustainedDuration ? peakPoint.spread : avg;
+
+                    // For context (prices), match the selection
+                    // If we show peak spread, we must show peak prices to match
+                    const finalAsk = hasSustainedDuration ? peakPoint.best_ask : (points.reduce((acc, p) => acc + (p.best_ask || 0), 0) / points.length);
+                    const finalBid = hasSustainedDuration ? peakPoint.best_bid : (points.reduce((acc, p) => acc + (p.best_bid || 0), 0) / points.length);
 
                     return {
-                        timestamp: new Date(bucket.timestamp).toISOString(),
-                        spread: parseFloat(avg(bucket.spreads).toFixed(4)), // AVERAGE Spread rule (Smoother)
-                        lighter_price: parseFloat(avg(bucket.best_asks).toFixed(2)),
-                        vest_price: parseFloat(avg(bucket.best_bids).toFixed(2))
+                        timestamp: new Date(Number(timestamp)).toISOString(),
+                        spread: parseFloat(finalSpread.toFixed(4)),
+                        lighter_price: parseFloat(finalAsk?.toFixed(2) || 0),
+                        vest_price: parseFloat(finalBid?.toFixed(2) || 0)
                     };
                 });
         }

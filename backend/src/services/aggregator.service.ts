@@ -166,6 +166,14 @@ function updateAndRecalculate() {
                         // Calculate spread for this specific combo
                         const spread = ((bidData.bid - askData.ask) / askData.ask) * 100;
 
+                        // DEBUG: Log calculation details to expose stale prices
+                        // Only log if spread is "significant" to avoid spam, or log one specific pair
+                        if (pair.symbol === 'ETH-USD' || pair.symbol === 'STRK-USD') { // Targeting active pairs
+                            const bidAge = Date.now() - bidData.timestamp;
+                            const askAge = Date.now() - askData.timestamp;
+                            console.log(`[SPREAD_DEBUG] ${pair.symbol} | ${bidExService.name}(${bidData.bid}) age:${bidAge}ms | ${askExService.name}(${askData.ask}) age:${askAge}ms | Spread: ${spread.toFixed(4)}%`);
+                        }
+
                         // Save record
                         saveSpread({
                             symbol: pair.symbol,
