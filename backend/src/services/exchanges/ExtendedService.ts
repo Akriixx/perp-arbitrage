@@ -74,6 +74,10 @@ class ExtendedService extends HybridExchangeService {
                     this.handleWsMessage(data);
                 });
 
+                this.ws.on('pong', () => {
+                    this.lastWsMessage = Date.now();
+                });
+
                 this.ws.on('error', (error: Error) => {
                     logger.error(TAG, 'WebSocket error', error as any);
                     if (!this.fallbackActive) {
@@ -161,6 +165,7 @@ class ExtendedService extends HybridExchangeService {
         this.pingInterval = setInterval(() => {
             if (this.ws && this.isWsConnected) {
                 try {
+                    logger.debug(TAG, 'Sending Ping 🏓');
                     this.ws.ping(); // Frame level ping
                 } catch (e) { }
             }

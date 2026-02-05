@@ -98,6 +98,10 @@ class LighterService extends HybridExchangeService {
                     this.handleWsMessage(data);
                 });
 
+                this.ws.on('pong', () => {
+                    this.lastWsMessage = Date.now();
+                });
+
                 this.ws.on('error', (error: Error) => {
                     logger.error(TAG, `WebSocket error: ${error.message}`);
                     if (!this.fallbackActive) {
@@ -261,10 +265,11 @@ class LighterService extends HybridExchangeService {
         this.pingInterval = setInterval(() => {
             if (this.ws && this.isWsConnected) {
                 try {
+                    logger.debug(TAG, 'Sending Ping 🏓');
                     this.ws.ping();
                 } catch (e) { }
             }
-        }, 30000);
+        }, 15000);
     }
 
     private stopPing(): void {
