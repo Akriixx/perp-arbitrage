@@ -182,7 +182,7 @@ export default function SpreadChart({ pair, liveData, bidEx, askEx }) {
             {/* Removed Direction Labels Overlay as requested */}
 
             {/* Chart */}
-            <div className="flex-1 min-h-[300px] relative z-10">
+            <div className="flex-1 min-h-[300px] relative z-10 w-full h-full">
                 {loading && !data && (
                     <div className="absolute inset-0 flex items-center justify-center z-10 bg-[#0f111a]/80">
                         <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />

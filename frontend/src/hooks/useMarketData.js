@@ -7,11 +7,17 @@ export function useMarketData() {
     const queryClient = useQueryClient();
 
     // Determine WS URL
+    // Determine WS URL
     const wsUrl = useMemo(() => {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = window.location.hostname;
-        const port = window.location.port === '5174' || window.location.port === '5173' ? '3000' : window.location.port;
-        return `${protocol}//${host}${port ? `:${port}` : ''}`;
+        const hostname = window.location.hostname;
+        const port = window.location.port;
+
+        // If running on dev ports (51xx), backend is on 3000
+        // Otherwise (production build preview), assume relative path or same port
+        const wsPort = (port && port.startsWith('51')) ? '3000' : port;
+
+        return `${protocol}//${hostname}${wsPort ? `:${wsPort}` : ''}`;
     }, []);
 
     // Throttle: Store latest data in ref, update UI at controlled interval

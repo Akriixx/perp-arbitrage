@@ -35,8 +35,7 @@ export const COMMON_HEADERS = {
 };
 
 export const ALLOWED_SYMBOLS = [
-    'BTC', 'ETH', 'SOL', 'PAXG', 'RESOLV', 'BERA', 'KAITO',
-    'AAVE', 'SUI', 'XRP', 'GRASS'
+    'BTC', 'ETH', 'SOL'
 ];
 
 export const ACTIVE_EXCHANGES = ['vest', 'lighter', 'paradex', 'extended', 'nado', 'zeroone'];

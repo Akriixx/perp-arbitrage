@@ -30,7 +30,10 @@ class LighterService extends HybridExchangeService {
 
     // Market ID mapping (symbol -> market_id)
     private marketIndexMap: Record<string, number> = {};
-    private orderBooks: Record<string, { bid: number; ask: number }> = {};
+    // Local OrderBook management
+    private orderBooks: Record<string, { bids: Map<number, number>; asks: Map<number, number> }> = {};
+    // Debug: track seen message types
+    private seenTypes: Set<string> = new Set();
 
     constructor() {
         const config: HybridConfig = {
@@ -73,6 +76,9 @@ class LighterService extends HybridExchangeService {
                 this.ws = new WebSocket(this.wsUrl);
 
                 this.ws.on('open', () => {
+                    // Clear local orderbooks on new connection to prevent stale data
+                    this.orderBooks = {};
+
                     const marketCount = Object.keys(this.marketIndexMap).length;
                     logger.info(TAG, `✅ WebSocket: CONNECTED (${marketCount} markets)`);
                     this.isWsConnected = true;
@@ -169,12 +175,24 @@ class LighterService extends HybridExchangeService {
         }
     }
 
+
+
     private handleWsMessage(data: WebSocket.Data): void {
         try {
             const msg = JSON.parse(data.toString());
 
-            // Handle order book updates
+            // Update timestamp on ANY message to prevent false fallback
+            this.lastWsMessage = Date.now();
+
+            // Log first message of each type for debugging
+            if (msg.type && !this.seenTypes?.has(msg.type)) {
+                if (!this.seenTypes) this.seenTypes = new Set();
+                this.seenTypes.add(msg.type);
+                logger.debug(TAG, `First ${msg.type} message received: ${JSON.stringify(msg).slice(0, 200)}`);
+            }
+
             if (msg.type === 'update/order_book' && msg.order_book) {
+                // Channel format: "order_book:0" (colon separator)
                 const channelParts = msg.channel.split(':');
                 if (channelParts.length !== 2) return;
 
@@ -182,48 +200,56 @@ class LighterService extends HybridExchangeService {
                 const symbol = Object.keys(this.marketIndexMap).find(s => this.marketIndexMap[s] === marketId);
                 if (!symbol) return;
 
-                const ob = msg.order_book;
+                // Initialize book if needed
+                if (!this.orderBooks[symbol]) {
+                    this.orderBooks[symbol] = { bids: new Map(), asks: new Map() };
+                }
 
-                // Get current values
-                let currentBid = this.orderBooks[symbol]?.bid || 0;
-                let currentAsk = this.orderBooks[symbol]?.ask || 0;
+                const book = this.orderBooks[symbol];
+                const ob = msg.order_book;
                 let updated = false;
 
-                // Update bids
-                if (ob.bids?.length > 0) {
-                    const validBids = ob.bids.map((b: any) => {
-                        if (Array.isArray(b)) return parseFloat(b[0]);
-                        return parseFloat(b.price || b[0]);
-                    }).filter((p: number) => !isNaN(p));
+                // Process Bids - Lighter format: { "price": STRING, "size": STRING }
+                if (ob.bids && ob.bids.length > 0) {
+                    ob.bids.forEach((b: any) => {
+                        const price = parseFloat(Array.isArray(b) ? b[0] : b.price);
+                        const size = parseFloat(Array.isArray(b) ? b[1] : b.size); // Lighter uses 'size' not 'amount'
 
-                    if (validBids.length > 0) {
-                        const newBestBid = Math.max(...validBids);
-                        if (newBestBid !== currentBid) {
-                            currentBid = newBestBid;
+                        if (!isNaN(price) && !isNaN(size)) {
+                            if (size === 0) {
+                                book.bids.delete(price);
+                            } else {
+                                book.bids.set(price, size);
+                            }
                             updated = true;
                         }
-                    }
+                    });
                 }
 
-                // Update asks
-                if (ob.asks?.length > 0) {
-                    const validAsks = ob.asks.map((a: any) => {
-                        if (Array.isArray(a)) return parseFloat(a[0]);
-                        return parseFloat(a.price || a[0]);
-                    }).filter((p: number) => !isNaN(p) && p > 0);
+                // Process Asks
+                if (ob.asks && ob.asks.length > 0) {
+                    ob.asks.forEach((a: any) => {
+                        const price = parseFloat(Array.isArray(a) ? a[0] : a.price);
+                        const size = parseFloat(Array.isArray(a) ? a[1] : a.size); // Lighter uses 'size' not 'amount'
 
-                    if (validAsks.length > 0) {
-                        const newBestAsk = Math.min(...validAsks);
-                        if (newBestAsk !== currentAsk) {
-                            currentAsk = newBestAsk;
+                        if (!isNaN(price) && !isNaN(size)) {
+                            if (size === 0) {
+                                book.asks.delete(price);
+                            } else {
+                                book.asks.set(price, size);
+                            }
                             updated = true;
                         }
-                    }
+                    });
                 }
 
-                if ((updated || !this.orderBooks[symbol]) && (currentBid > 0 || currentAsk > 0)) {
-                    this.orderBooks[symbol] = { bid: currentBid, ask: currentAsk };
-                    this.onWsUpdate(symbol, currentBid, currentAsk);
+                if (updated) {
+                    const bestBid = book.bids.size > 0 ? Math.max(...book.bids.keys()) : 0;
+                    const bestAsk = book.asks.size > 0 ? Math.min(...book.asks.keys()) : 0;
+
+                    if (bestBid > 0 && bestAsk > 0) {
+                        this.onWsUpdate(symbol, bestBid, bestAsk);
+                    }
                 }
             }
         } catch (e) {

@@ -1,8 +1,11 @@
-import React from 'react';
-import { Bell, BellOff, X, TrendingUp } from 'lucide-react';
+import React, { useCallback } from 'react';
+import { Bell } from 'lucide-react';
 import { motion } from 'framer-motion';
 import CryptoIcon from './CryptoIcon';
 import ExchangeIcon from './ExchangeIcon';
+import AlertBadge from './AlertBadge';
+import ProfitBadge from './ProfitBadge';
+import SettingsPopup from './SettingsPopup';
 import { PAIR_LEVERAGE } from '../../utils/constants';
 
 const OpportunityCard = React.memo(({
@@ -29,6 +32,11 @@ const OpportunityCard = React.memo(({
     const estProfit = (margin * leverage) * (spread / 100);
     const isNegligible = estProfit < 1;
 
+    const handleSettingsToggle = useCallback((e) => {
+        e.stopPropagation();
+        setSettingsOpenFor(isSettingsOpen ? null : row.symbol);
+    }, [isSettingsOpen, row.symbol, setSettingsOpenFor]);
+
     return (
         <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
@@ -44,22 +52,11 @@ const OpportunityCard = React.memo(({
                 }
             `}
         >
-            {/* Alert Indicator */}
-            {isAlerting && (
-                <div className="absolute top-0 right-0 p-2">
-                    <span className="flex h-3 w-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span>
-                    </span>
-                </div>
-            )}
+            <AlertBadge isAlerting={isAlerting} />
 
             {/* Alert Settings Button */}
             <button
-                onClick={(e) => {
-                    e.stopPropagation();
-                    setSettingsOpenFor(isSettingsOpen ? null : row.symbol);
-                }}
+                onClick={handleSettingsToggle}
                 className={`absolute top-3 right-3 z-10 p-2 rounded-xl transition-all duration-300 ${isAlerting || hasCustomThreshold
                     ? 'bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20 shadow-lg shadow-yellow-500/10'
                     : 'text-gray-600 hover:text-gray-300 hover:bg-white/5'
@@ -68,60 +65,14 @@ const OpportunityCard = React.memo(({
                 <Bell className={`w-4 h-4 ${hasCustomThreshold ? 'fill-current' : ''}`} />
             </button>
 
-            {/* Settings Popup */}
-            {isSettingsOpen && (
-                <div
-                    onClick={(e) => e.stopPropagation()}
-                    className="absolute top-10 right-2 z-20 w-64 bg-[#1f2937] border border-gray-700 rounded-xl shadow-2xl p-4"
-                >
-                    <div className="flex justify-between items-center mb-3">
-                        <h3 className="text-white font-bold text-sm flex items-center gap-2">
-                            <Bell className="w-3.5 h-3.5 text-blue-400" />
-                            Alerts for {row.symbol}
-                        </h3>
-                        <button onClick={() => setSettingsOpenFor(null)} className="text-gray-500 hover:text-white transition-colors">
-                            <X className="w-4 h-4" />
-                        </button>
-                    </div>
-
-                    <div className="flex flex-col gap-3">
-                        <div>
-                            <label className="text-xs text-gray-400 mb-1 block">Threshold (%)</label>
-                            <div className="flex gap-2">
-                                <input
-                                    type="number"
-                                    defaultValue={threshold}
-                                    step="0.1"
-                                    min="0.01"
-                                    max="10"
-                                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500"
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') updateThreshold(row.symbol, e.currentTarget.value);
-                                    }}
-                                    id={`input-${row.symbol}`}
-                                />
-                                <button
-                                    onClick={() => {
-                                        const val = document.getElementById(`input-${row.symbol}`).value;
-                                        updateThreshold(row.symbol, val);
-                                    }}
-                                    className="bg-blue-600 hover:bg-blue-500 text-white px-3 rounded-lg text-xs font-bold"
-                                >
-                                    Save
-                                </button>
-                            </div>
-                        </div>
-
-                        <button
-                            onClick={() => updateThreshold(row.symbol, null)}
-                            className="flex items-center gap-2 text-[10px] text-gray-500 hover:text-white transition-colors self-start opacity-70 hover:opacity-100"
-                        >
-                            <BellOff className="w-3 h-3" />
-                            Désactiver l'alerte
-                        </button>
-                    </div>
-                </div>
-            )}
+            <SettingsPopup
+                symbol={row.symbol}
+                threshold={threshold}
+                isOpen={isSettingsOpen}
+                onClose={() => setSettingsOpenFor(null)}
+                onUpdate={updateThreshold}
+                hasCustomThreshold={hasCustomThreshold}
+            />
 
             {/* Header: Icon + Name */}
             <div className="flex items-center gap-3 mb-2">
@@ -141,26 +92,12 @@ const OpportunityCard = React.memo(({
                 </div>
             </div>
 
-            {/* Spread Badge + Est. Profit */}
-            <div className={`
-                border rounded-xl text-center py-2 px-4 my-4 flex flex-col items-center gap-1
-                ${isAlerting
-                    ? 'bg-yellow-500/10 border-yellow-500/30'
-                    : 'bg-blue-500/10 border-blue-500/30 group-hover:bg-blue-500/15'
-                }
-            `}>
-                <span className={`font-bold text-lg ${isAlerting ? 'text-yellow-400' : 'text-blue-400'}`}>
-                    Spread {spread.toFixed(2)}%
-                </span>
-
-                {/* Est. Profit Badge (Static Margin) */}
-                {estProfit > 0 && (
-                    <span className={`text-xs font-black tracking-wide flex items-center gap-1 ${isNegligible ? 'text-gray-500' : 'text-emerald-400'}`}>
-                        {!isNegligible && <TrendingUp className="w-3 h-3" />}
-                        Est. +${estProfit.toFixed(2)}
-                    </span>
-                )}
-            </div>
+            <ProfitBadge
+                spread={spread}
+                estProfit={estProfit}
+                isAlerting={isAlerting}
+                isNegligible={isNegligible}
+            />
 
             {/* Strategy Details */}
             <div className="space-y-2">

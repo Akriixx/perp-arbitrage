@@ -216,7 +216,7 @@ export class NadoService extends HybridExchangeService {
                     }
                 }
             });
-            logger.info(TAG, `Mapped ${this.productMap.size} symbols from NADO`);
+            logger.debug(TAG, `Mapped ${this.productMap.size} symbols from NADO`);
         } catch (error: any) {
             logger.error(TAG, `Failed to fetch NADO symbols: ${error.message}`);
         }

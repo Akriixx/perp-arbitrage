@@ -40,17 +40,7 @@ export const SPREAD_THRESHOLDS = {
 export const PAIR_LEVERAGE = {
     'BTC': 50,
     'ETH': 50,
-    'SOL': 20,
-    'PAXG': 10,
-    'AAVE': 10,
-    'SUI': 10,
-    'XRP': 10,
-    'GRASS': 5,
-    'MYX': 3,
-    'LIT': 5,
-    'RESOLV': 3,
-    'BERA': 5,
-    'KAITO': 5
+    'SOL': 20
 };
 
-export const AVAILABLE_SYMBOLS = ['BTC', 'ETH', 'SOL', 'PAXG', 'RESOLV', 'BERA', 'KAITO', 'AAVE', 'SUI', 'XRP', 'GRASS'];
+export const AVAILABLE_SYMBOLS = ['BTC', 'ETH', 'SOL'];
